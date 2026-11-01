@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Mis proveedores · ERA shop{% endblock %}
+{% block content %}
+  <p class="kicker">{{ cliente.ciudad }}</p>
+  <h2>{{ cliente.nombre_tienda }}</h2>
+  <p class="muted">Proveedores con los que estás conectado. Abre cada lista para ver precios, fotos y especificaciones.</p>
+  <h3>Pedidos</h3>
+  <p class="muted">Tus compras quedan aquí. La conversación con el proveedor es este pedido, no un chat por fuera.</p>
+  <table>
+    <tr><th>#</th><th>Producto</th><th>Proveedor</th><th>Cant.</th><th>Total</th><th>Pago</th><th></th></tr>
+    {% for p in pedidos %}
+      <tr>
+        <td>{{ p.id }}</td>
+        <td>{{ p.producto.titulo|truncatechars:40 }}</td>
+        <td>{% if p.vendedor %}{{ p.vendedor.nombre_tienda }}{% else %}ERA shop{% endif %}</td>
+        <td>{{ p.cantidad }}</td>
+        <td>${{ p.monto_cop }}</td>
+        <td>{{ p.get_estado_pago_display }}</td>
+        <td><a href="{% url 'conversacion_pedido' p.id %}">Abrir pedido</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7">Todavía no tienes pedidos.</td></tr>
+    {% endfor %}
+  </table>
+  <p><a class="btn" href="{% url 'proveedores_mayor' %}">Buscar mayoristas e importadores</a></p>
+  <div class="catalog">
+    {% for c in conexiones %}
+      <article class="product">
+        <div class="body">
+          <p class="kicker">{{ c.proveedor.get_tipo_display }}</p>
+          <h3>{{ c.proveedor.nombre_tienda }}</h3>
+          <p class="meta">{{ c.proveedor.ciudad }}</p>
+          {% if c.proveedor.estado == "activo" %}
+            <a class="btn" href="{% url 'lista_mayorista' c.proveedor.slug %}">Ver lista de precios</a>
+          {% else %}
+            <p class="meta">Este proveedor ya no está en la página.</p>
+          {% endif %}
+        </div>
+      </article>
+    {% empty %}
+      <p>Todavía no te conectas con ningún proveedor.</p>
+    {% endfor %}
+  </div>
+{% endblock %}

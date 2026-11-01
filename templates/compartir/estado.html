@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Publicar · ERA shop{% endblock %}
+{% block content %}
+<div class="story-page">
+  <div class="phone" id="estado-preview">
+    <p class="mark">ERA shop</p>
+    <p>{{ kicker }}</p>
+    <h2>{{ titulo }}</h2>
+    {% if precio %}<p class="big">{{ precio }}</p>{% endif %}
+    <p>{{ detalle }}</p>
+  </div>
+  <div class="story-actions"
+       data-share
+       data-title="{{ titulo }}"
+       data-text="Pide en ERA shop"
+       data-url="{{ enlace }}"
+       data-price="{{ precio }}"
+       data-kicker="{{ kicker }}">
+    <button type="button" class="btn" data-kind="estado">Publicar en estados</button>
+    <a class="btn sec" data-net="whatsapp" target="_blank" rel="noopener">WhatsApp</a>
+    <a class="btn sec" data-net="facebook" target="_blank" rel="noopener">Facebook</a>
+    <button type="button" class="btn sec" data-kind="copiar">Copiar enlace del pedido</button>
+    <a class="btn ink" href="{{ enlace }}">Abrir la página del pedido</a>
+  </div>
+</div>
+{% endblock %}

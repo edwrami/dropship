@@ -1,0 +1,19 @@
+﻿{% extends "base.html" %}
+{% block content %}
+  <h2>Agregar producto por URL</h2>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post">{% csrf_token %}
+    <label>URL del producto (AliExpress u outlet)</label>
+    <input name="url" placeholder="https://es.aliexpress.com/item/... o https://www.6pm.com/..." required>
+    <label>Título (opcional si la extracción falla)</label>
+    <input name="titulo" placeholder="Nombre del producto">
+    <label>Costo USD (opcional; si AliExpress no trae precio)</label>
+    <input name="precio_costo" type="number" step="0.01" placeholder="12.50">
+    <label>Margen de ganancia (%)</label>
+    <input name="margen" type="number" value="40" step="1">
+    <label>Peso estimado (libras)</label>
+    <input name="peso" type="number" step="0.1" value="1">
+    <button class="btn" type="submit">Extraer y publicar</button>
+  </form>
+  <p style="color:#666;font-size:.9em">Pega la URL. Si AliExpress bloquea, completa título y costo y se publica igual.</p>
+{% endblock %}

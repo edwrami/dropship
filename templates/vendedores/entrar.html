@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Entrar a la tienda</h2>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" style="max-width:420px">{% csrf_token %}
+    <label>Correo</label>
+    <input type="email" name="email" required>
+    <label>Contraseña</label>
+    <input type="password" name="password" required>
+    <button class="btn" type="submit">Entrar</button>
+  </form>
+  <p class="muted">¿Aún no vendes? <a href="{% url 'registro_vendedor' %}">Registra tu mercancía</a>.</p>
+{% endblock %}

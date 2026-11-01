@@ -1,0 +1,147 @@
+﻿{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Registro de ventas · ERA shop{% endblock %}
+{% block content %}
+  <p class="kicker">ERA shop</p>
+  <h2>Registro de ventas</h2>
+  <p class="muted">Cada venta con la tienda, el cliente, las cantidades y la comisión. Busca por nombre, teléfono, ciudad, referencia, producto o documento.</p>
+
+  <div class="pay-grid">
+    <section class="card">
+      <p>Ventas en esta búsqueda</p>
+      <strong>{{ totales.ventas|default:0 }}</strong>
+      <p>{{ totales.unidades|default:0 }} unidades · ${{ totales.dinero|default:0|floatformat:0|intcomma }}</p>
+      <p>Comisión generada ${{ totales.comision|default:0|floatformat:0|intcomma }}</p>
+    </section>
+    <section class="card">
+      <p>Te deben</p>
+      <strong>${{ deben|floatformat:0|intcomma }}</strong>
+      <p>Con comprobante, sin confirmar: ${{ reportado|floatformat:0|intcomma }}</p>
+      <p>Ya liquidado: ${{ pagado|floatformat:0|intcomma }}</p>
+    </section>
+  </div>
+
+  <form method="post" class="card" style="max-width:520px">{% csrf_token %}
+    <input type="hidden" name="accion" value="nequi">
+    <p>Las comisiones, de mayoristas y de minoristas, se consignan a este Nequi.</p>
+    <label>Titular<input name="titular" value="{{ titular }}"></label>
+    <label>Tu Nequi<input name="nequi" value="{{ nequi }}" placeholder="10 dígitos, empieza por 3" required></label>
+    <button class="btn" type="submit">Guardar Nequi</button>
+  </form>
+
+  <form method="post" class="card" style="max-width:520px">{% csrf_token %}
+    <input type="hidden" name="accion" value="wompi">
+    <p>Tarjeta débito y crédito. {% if wompi_conectado %}Wompi ya está conectado. Si pegas otra llave, reemplaza la anterior.{% else %}Pega las llaves de tu cuenta Wompi para activar el botón de tarjeta.{% endif %}</p>
+    <label>Llave pública<input name="wompi_publica" autocomplete="off"></label>
+    <label>Secreto de integridad<input name="wompi_integridad" type="password" autocomplete="off"></label>
+    <label>Secreto de eventos<input name="wompi_eventos" type="password" autocomplete="off"></label>
+    <button class="btn" type="submit">Guardar Wompi</button>
+  </form>
+
+  <form class="filters-grid filters" method="get">
+    <label>Buscar<input name="q" value="{{ request.GET.q }}" placeholder="Cliente, tienda, teléfono, producto"></label>
+    <label>Ciudad<input name="ciudad" value="{{ request.GET.ciudad }}"></label>
+    <label>Tipo de vendedor
+      <select name="tipo">
+        <option value="">Todos</option>
+        <option value="minorista" {% if request.GET.tipo == "minorista" %}selected{% endif %}>Minoristas</option>
+        {% for valor, nombre in tipos %}
+          <option value="{{ valor }}" {% if request.GET.tipo == valor %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Pago
+      <select name="pago">
+        <option value="">Todos</option>
+        {% for valor, nombre in pagos %}
+          <option value="{{ valor }}" {% if request.GET.pago == valor %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Comisión
+      <select name="comision">
+        <option value="">Todas</option>
+        {% for valor, nombre in comisiones %}
+          <option value="{{ valor }}" {% if request.GET.comision == valor %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Estado del pedido
+      <select name="estado">
+        <option value="">Todos</option>
+        {% for valor, nombre in estados %}
+          <option value="{{ valor }}" {% if request.GET.estado == valor %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Desde<input type="date" name="desde" value="{{ request.GET.desde }}"></label>
+    <label>Hasta<input type="date" name="hasta" value="{{ request.GET.hasta }}"></label>
+    <label>Monto mínimo<input name="monto_min" value="{{ request.GET.monto_min }}"></label>
+    <label>Monto máximo<input name="monto_max" value="{{ request.GET.monto_max }}"></label>
+    <label class="checks"><input type="checkbox" name="con_comprobante" value="1" {% if request.GET.con_comprobante == "1" %}checked{% endif %}> Con foto de comprobante</label>
+    <div>
+      <button class="btn" type="submit">Consultar</button>
+      <a class="btn sec" href="{% url 'lista_pedidos' %}">Limpiar</a>
+    </div>
+  </form>
+
+  <table>
+    <tr>
+      <th>#</th><th>Fecha</th><th>Vendedor</th><th>Cliente</th><th>Producto</th>
+      <th>Cant.</th><th>Venta</th><th>Comisión</th><th>Estado</th><th></th>
+    </tr>
+    {% for p in pedidos %}
+      <tr>
+        <td>{{ p.id }}</td>
+        <td>{{ p.creado|date:"d/m/Y H:i" }}</td>
+        <td>
+          {% if p.vendedor %}
+            {{ p.vendedor.nombre_tienda }}<br>
+            <small>{{ p.vendedor.get_tipo_display }} · {{ p.vendedor.ciudad }}<br>
+            {{ p.vendedor.responsable }} · {{ p.vendedor.telefono }}<br>
+            {{ p.vendedor.documento }}</small>
+          {% else %}Sin vendedor{% endif %}
+        </td>
+        <td>
+          {{ p.cliente_nombre }}<br>
+          <small>{{ p.cliente_telefono }}{% if p.cliente_email %} · {{ p.cliente_email }}{% endif %}<br>
+          {{ p.cliente_direccion }} · {{ p.cliente_ciudad }}</small>
+        </td>
+        <td>{{ p.producto.titulo|truncatechars:40 }}{% if p.variante %}<br><small>{{ p.variante }}</small>{% endif %}</td>
+        <td>{{ p.cantidad }}</td>
+        <td>${{ p.monto_cop|floatformat:0|intcomma }}</td>
+        <td>
+          ${{ p.comision_cop|floatformat:0|intcomma }}
+          <br><small>{{ p.get_estado_comision_display }}</small>
+          {% if p.comprobante_comision %}<br><small>ID {{ p.comprobante_comision }}</small>{% endif %}
+          {% if p.comprobante_url %}<br><a href="{{ p.comprobante_url }}" target="_blank" rel="noopener">Ver comprobante</a>{% endif %}
+        </td>
+        <td>{{ p.get_estado_pago_display }}<br><small>{{ p.get_estado_display }}</small></td>
+        <td>
+          <a href="{% url 'conversacion_pedido' p.id %}">Conversación</a>
+          {% if p.estado_comision == "reportada" or p.estado_comision == "pendiente" %}
+            <form method="post" action="?{{ request.GET.urlencode }}">{% csrf_token %}
+              <input type="hidden" name="pedido" value="{{ p.id }}">
+              <button class="btn" name="accion" value="confirmar" type="submit">Confirmar</button>
+            </form>
+          {% endif %}
+          {% if p.estado_comision == "reportada" %}
+            <form method="post" action="?{{ request.GET.urlencode }}">{% csrf_token %}
+              <input type="hidden" name="pedido" value="{{ p.id }}">
+              <button class="btn sec" name="accion" value="rechazar" type="submit">Rechazar</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="10">No hay ventas con esos criterios.</td></tr>
+    {% endfor %}
+  </table>
+  {% if pagina.paginator.num_pages > 1 %}
+    <p>
+      {% if pagina.has_previous %}<a href="?p={{ pagina.previous_page_number }}&{{ request.GET.urlencode }}">Anterior</a>{% endif %}
+      {{ pagina.number }} / {{ pagina.paginator.num_pages }}
+      {% if pagina.has_next %}<a href="?p={{ pagina.next_page_number }}&{{ request.GET.urlencode }}">Siguiente</a>{% endif %}
+    </p>
+  {% endif %}
+{% endblock %}

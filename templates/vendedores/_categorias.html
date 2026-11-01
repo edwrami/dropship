@@ -1,0 +1,29 @@
+<label for="filtro-cat">Categorías de la mercancía</label>
+<input type="search" id="filtro-cat" placeholder="Filtra, por ejemplo: calzado, neveras, repuestos">
+<p class="muted">Elige todas las que vendas. Hay un grupo por tipo de mercancía y, dentro, la categoría concreta.</p>
+{% for g in grupos %}
+  <div class="grupo-cat">
+    <strong>{{ g.nombre }}</strong>
+    <button type="button" class="btn sec" onclick="marcarGrupo(this, true)">Marcar grupo</button>
+    <button type="button" class="btn sec" onclick="marcarGrupo(this, false)">Quitar</button>
+    {% for h in g.hijos.all %}
+      <label data-cat="{{ g.nombre }} {{ h.nombre }}">
+        <input type="checkbox" name="categorias" value="{{ h.id }}" {% if h.id in seleccionadas %}checked{% endif %}>
+        {{ h.nombre }}
+      </label>
+    {% endfor %}
+  </div>
+{% endfor %}
+<script>
+function marcarGrupo(btn, valor) {
+  btn.closest(".grupo-cat").querySelectorAll('input[type="checkbox"]').forEach(function (caja) {
+    caja.checked = valor;
+  });
+}
+document.getElementById("filtro-cat").addEventListener("input", function () {
+  var q = this.value.toLowerCase();
+  document.querySelectorAll("[data-cat]").forEach(function (el) {
+    el.style.display = el.getAttribute("data-cat").toLowerCase().indexOf(q) >= 0 ? "" : "none";
+  });
+});
+</script>

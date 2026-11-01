@@ -1,0 +1,139 @@
+from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP
+
+from django.conf import settings
+from django.db import transaction
+from django.db.models import Avg, F, Max, Min
+from django.utils import timezone
+
+from pedidos.models import Pedido
+from productos.models import Producto
+
+from .opciones import banda_precio
+
+
+def aplicar_comision(pedido):
+    """Calcula el 10% sobre el valor cobrado al cliente."""
+    if not pedido.vendedor_id:
+        pedido.comision_pct = 0
+        pedido.comision_cop = 0
+        pedido.neto_vendedor = pedido.monto_cop or 0
+        pedido.estado_comision = "exenta"
+        return
+    pct = Decimal(str(settings.COMISION_PCT))
+    monto = Decimal(str(pedido.monto_cop or 0))
+    comision = (monto * pct / Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    pedido.comision_pct = pct
+    pedido.comision_cop = comision
+    pedido.neto_vendedor = monto - comision
+    if pedido.estado_comision in ("", "exenta"):
+        pedido.estado_comision = "por_confirmar"
+
+
+def activar_cobro_comision(pedido):
+    """La liquidación corre cuando el cliente ya pagó."""
+    if not pedido.vendedor_id or pedido.estado_comision != "por_confirmar":
+        return
+    dias = int(getattr(settings, "DIAS_LIQUIDACION", 5))
+    pedido.estado_comision = "pendiente"
+    pedido.fecha_limite_comision = timezone.now() + timedelta(days=dias)
+    pedido.save(update_fields=["estado_comision", "fecha_limite_comision"])
+
+
+def reclasificar_vendedor(vendedor):
+    stats = Producto.objects.filter(vendedor=vendedor, activo=True).aggregate(
+        mn=Min("precio_final_cop"),
+        mx=Max("precio_final_cop"),
+        prom=Avg("precio_final_cop"),
+    )
+    if stats["prom"] is None:
+        return
+    vendedor.precio_desde = stats["mn"]
+    vendedor.precio_hasta = stats["mx"]
+    vendedor.rango_precio = banda_precio(stats["prom"])
+    vendedor.save(update_fields=["precio_desde", "precio_hasta", "rango_precio"])
+
+
+@transaction.atomic
+def expulsar_vendedor(vendedor, motivo):
+    from .models import Vendedor
+
+    vendedor = Vendedor.objects.select_for_update().get(pk=vendedor.pk)
+    if vendedor.estado != "expulsado":
+        vendedor.estado = "expulsado"
+        vendedor.motivo_sancion = motivo
+        vendedor.fecha_sancion = timezone.now()
+        vendedor.save(update_fields=["estado", "motivo_sancion", "fecha_sancion"])
+    Producto.objects.filter(vendedor=vendedor, activo=True).update(activo=False)
+    return vendedor
+
+
+def aplicar_sanciones():
+    """Quien no liquida el 10% a tiempo sale del catálogo."""
+    ahora = timezone.now()
+    vencidos = (
+        Pedido.objects.filter(
+            estado_comision="pendiente",
+            fecha_limite_comision__lt=ahora,
+            vendedor__isnull=False,
+        )
+        .select_related("vendedor")
+        .order_by("fecha_limite_comision")
+    )
+    retirados = 0
+    ya = set()
+    for pedido in vencidos:
+        pedido.estado_comision = "vencida"
+        pedido.save(update_fields=["estado_comision"])
+        if pedido.vendedor_id in ya or pedido.vendedor.estado == "expulsado":
+            ya.add(pedido.vendedor_id)
+            continue
+        pct = getattr(settings, "COMISION_PCT", 10)
+        expulsar_vendedor(
+            pedido.vendedor,
+            f"No liquidó la comisión del {pct}% del pedido #{pedido.id}. "
+            "La tienda fue retirada de la página.",
+        )
+        ya.add(pedido.vendedor_id)
+        retirados += 1
+    return retirados
+
+
+def devolver_stock(pedido):
+    if not pedido.producto_id or not pedido.cantidad:
+        return
+    Producto.objects.filter(pk=pedido.producto_id, controla_stock=True).update(
+        stock=F("stock") + pedido.cantidad
+    )
+
+
+@transaction.atomic
+def cancelar_pedido_vendedor(pedido, vendedor, acepta_sancion):
+    pedido = Pedido.objects.select_for_update().get(pk=pedido.pk)
+    if pedido.estado in ("fallido", "entregado"):
+        return "cerrado"
+    if pedido.estado_comision == "pagada":
+        return "ya_liquidada"
+    if pedido.estado_comision in ("pendiente", "reportada"):
+        if not acepta_sancion:
+            return "falta_aceptar"
+        pedido.estado = "fallido"
+        pedido.estado_comision = "vencida"
+        nota = "El vendedor canceló la venta con la comisión ya generada."
+        pedido.notas = f"{pedido.notas}\n{nota}".strip() if pedido.notas else nota
+        pedido.save()
+        devolver_stock(pedido)
+        pct = getattr(settings, "COMISION_PCT", 10)
+        expulsar_vendedor(
+            vendedor,
+            f"Canceló el pedido #{pedido.id} con la comisión del {pct}% pendiente. "
+            "La tienda fue retirada de la página.",
+        )
+        return "expulsado"
+    pedido.estado = "fallido"
+    pedido.estado_comision = "anulada"
+    nota = "Pedido anulado antes del pago del cliente. No hubo comisión."
+    pedido.notas = f"{pedido.notas}\n{nota}".strip() if pedido.notas else nota
+    pedido.save()
+    devolver_stock(pedido)
+    return "anulado"

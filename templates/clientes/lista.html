@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Lista de {{ proveedor.nombre_tienda }} · ERA shop{% endblock %}
+{% block content %}
+  <p class="kicker">{{ proveedor.get_tipo_display }} · {{ proveedor.ciudad }}</p>
+  <h2>{{ proveedor.nombre_tienda }}</h2>
+  <p class="muted">Precio al por mayor, fotos y ficha. El teléfono del proveedor sigue oculto hasta que haces un pedido.</p>
+  <p>
+    <a class="btn sec" href="{% url 'proveedores_mayor' %}">Volver a proveedores</a>
+    <a class="btn sec" href="{% url 'tienda_publica' proveedor.slug %}">Ver tienda pública</a>
+  </p>
+  <div class="mayor-list">
+    {% for p in productos %}
+      <article class="mayor-item">
+        <div class="photo">{% include "productos/_slider.html" with producto=p %}</div>
+        <div>
+          <p class="kicker">{% if p.rubro %}{{ p.rubro.nombre }}{% else %}{{ p.categoria }}{% endif %}</p>
+          <h3>{{ p.titulo }}</h3>
+          <p class="price">Al por mayor ${{ p.precio_mayor_cop|floatformat:0|intcomma }} COP</p>
+          <p class="meta">Mostrador ${{ p.precio_final_cop|floatformat:0|intcomma }} · mínimo {{ p.cantidad_minima }}{% if p.unidad_empaque %} · {{ p.unidad_empaque }}{% endif %}</p>
+          <ul class="specs">
+            {% if p.marca %}<li>Marca: {{ p.marca }}</li>{% endif %}
+            <li>Condición: {{ p.get_condicion_display }}</li>
+            {% if p.material %}<li>Material: {{ p.material }}</li>{% endif %}
+            {% if p.color %}<li>Color: {{ p.color }}</li>{% endif %}
+            {% if p.talla %}<li>Talla: {{ p.talla }}</li>{% endif %}
+            {% if p.sku %}<li>Referencia: {{ p.sku }}</li>{% endif %}
+            {% if p.entrega_texto %}<li>Entrega: {{ p.entrega_texto }}</li>{% endif %}
+            <li>{% if p.envio_gratis %}Envío gratis{% else %}Envío ${{ p.costo_envio_cop|floatformat:0|intcomma }}{% endif %}</li>
+            {% if p.garantia_dias %}<li>Garantía: {{ p.garantia_dias }} días</li>{% endif %}
+            {% if p.controla_stock %}<li>Disponibles: {{ p.stock }}</li>{% endif %}
+          </ul>
+          {% if p.descripcion %}<div class="muted">{{ p.descripcion|linebreaks }}</div>{% endif %}
+          <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir desde {{ p.cantidad_minima }}</a>
+        </div>
+      </article>
+    {% empty %}
+      <p>Este proveedor aún no publicó precios al por mayor.</p>
+    {% endfor %}
+  </div>
+{% endblock %}

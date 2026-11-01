@@ -1,0 +1,20 @@
+{% with fotos=producto.fotos.all %}
+<div class="slider" data-slider tabindex="0" aria-label="Fotos del producto">
+  <div class="slider-track">
+    {% for foto in fotos %}
+      <img src="{{ foto.url }}" alt="{{ producto.titulo }}, foto {{ forloop.counter }} de {{ fotos|length }}">
+    {% empty %}
+      {% if producto.imagen %}<img src="{{ producto.imagen }}" alt="{{ producto.titulo }}">{% endif %}
+    {% endfor %}
+  </div>
+  {% if fotos|length > 1 %}
+    <button type="button" class="slider-nav prev" data-dir="-1" aria-label="Foto anterior">‹</button>
+    <button type="button" class="slider-nav next" data-dir="1" aria-label="Foto siguiente">›</button>
+    <div class="slider-dots">
+      {% for foto in fotos %}
+        <button type="button" class="dot{% if forloop.first %} on{% endif %}" data-i="{{ forloop.counter0 }}" aria-label="Ir a la foto {{ forloop.counter }}"></button>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endwith %}

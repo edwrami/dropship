@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ tienda.nombre_tienda }} · ERA shop{% endblock %}
+{% block description %}Tienda {{ tienda.nombre_tienda }} en {{ tienda.ciudad }}. Pide en ERA shop.{% endblock %}
+{% block meta %}
+<meta property="og:site_name" content="ERA shop">
+<meta property="og:title" content="{{ tienda.nombre_tienda }}">
+<meta property="og:description" content="{{ tienda.get_tipo_display }} en {{ tienda.ciudad }}. Pide en ERA shop.">
+<meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{% url 'tienda_publica' tienda.slug %}">
+<meta property="og:type" content="website">
+{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">{{ tienda.get_tipo_display }} · {{ tienda.ciudad }}</p>
+    <h1>{{ tienda.nombre_tienda }}</h1>
+    <p class="lede">Elige un producto y pide. La conversación queda dentro del pedido.</p>
+    <p class="meta">{% if total_calificaciones %}{{ promedio|floatformat:1 }} de 5 · {{ total_calificaciones }} calificaciones{% else %}Sin calificaciones todavía{% endif %}</p>
+  </div>
+  <aside class="hero-card">
+    <p>Rango de la tienda</p>
+    <strong>{{ tienda.get_rango_precio_display }}</strong>
+    <p>{% for c in tienda.categorias.all %}{{ c.nombre }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+  </aside>
+</section>
+{% if vendedor_actual and vendedor_actual.id == tienda.id %}
+  <h2>Publicar la tienda</h2>
+  {% include "compartir/_botones.html" with titulo_share=tienda.nombre_tienda texto_share="Mira mi tienda en ERA shop" url_share=request.path precio_share="" kicker_share=tienda.ciudad %}
+  <p><a class="btn sec" href="{% url 'estado_tienda' tienda.slug %}">Vista de estado</a></p>
+{% endif %}
+<div class="catalog">
+  {% for p in productos %}
+    <article class="product">
+      <a class="media" href="{% url 'detalle_producto' p.pk %}">{% if p.fotos.all %}<img src="{{ p.fotos.all.0.url }}" alt="">{% elif p.imagen %}<img src="{{ p.imagen }}" alt="">{% endif %}</a>
+      <div class="body">
+        <p class="kicker">{% if p.rubro %}{{ p.rubro.nombre }}{% else %}Producto{% endif %}</p>
+        <h3>{{ p.titulo|truncatechars:64 }}</h3>
+        <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
+        <p class="meta">{% if p.entrega_texto %}Entrega {{ p.entrega_texto }}{% endif %}</p>
+        <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir</a>
+      </div>
+    </article>
+  {% empty %}
+    <p>Esta tienda todavía no tiene productos visibles.</p>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+﻿{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ERA shop{% endblock %}</title>
+  <meta name="description" content="{% block description %}ERA shop. Pide directo al anunciante. El contacto aparece cuando haces el pedido.{% endblock %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'era.css' %}">
+  {% block meta %}
+  <meta property="og:site_name" content="ERA shop">
+  <meta property="og:title" content="ERA shop">
+  <meta property="og:description" content="Pide directo al anunciante.">
+  <meta property="og:type" content="website">
+  {% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="{% url 'lista_productos' %}">ERA <span>shop</span></a>
+      <nav class="nav">
+        <a href="{% url 'lista_productos' %}">Catálogo</a>
+        <a href="{% url 'proveedores_mayor' %}">Mayoristas</a>
+        {% if user.is_staff %}<a href="{% url 'lista_pedidos' %}">Ventas</a>{% endif %}
+        {% if vendedor_actual %}
+          <a href="{% url 'panel_vendedor' %}">Mi tienda</a>
+          <a href="{% url 'salir_vendedor' %}">Salir</a>
+        {% elif cliente_actual %}
+          <a href="{% url 'mis_proveedores' %}">Mis proveedores</a>
+          <a href="{% url 'salir_vendedor' %}">Salir</a>
+        {% else %}
+          <a href="{% url 'registro_cliente' %}">Soy tienda</a>
+          <a class="solid" href="{% url 'registro_vendedor' %}">Vender</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="wrap">
+      {% if messages %}
+        {% for m in messages %}
+          <div class="{% if 'error' in m.tags %}error{% else %}ok{% endif %}">{{ m }}</div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap">ERA shop · el contacto del anunciante aparece cuando haces el pedido · comisión {{ comision_pct }}%</div>
+  </footer>
+  <script src="{% static 'era.js' %}"></script>
+</body>
+</html>

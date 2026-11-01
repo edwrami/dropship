@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+  <p class="eyebrow">Tu vitrina</p>
+  <h2>{{ vendedor.nombre_tienda }}</h2>
+  {% if vendedor.slug %}
+    <p class="muted">Publica la tienda. Quien pulse el enlace llega al catálogo de tu mercancía para pedir.</p>
+    {% url 'tienda_publica' vendedor.slug as ruta_tienda %}
+    {% include "compartir/_botones.html" with titulo_share=vendedor.nombre_tienda texto_share="Mira mi tienda en ERA shop" url_share=ruta_tienda precio_share="" kicker_share=vendedor.ciudad %}
+    <p><a class="btn sec" href="{% url 'tienda_publica' vendedor.slug %}">Ver mi tienda</a>
+       <a class="btn sec" href="{% url 'estado_tienda' vendedor.slug %}">Estado de la tienda</a></p>
+  {% endif %}
+  {% if vendedor.estado == "expulsado" %}
+    <div class="error">
+      <strong>Tienda retirada de la página.</strong>
+      <p>{{ vendedor.motivo_sancion }}</p>
+      <p>Tus productos ya no aparecen en el catálogo. Pagar la deuda no te publica de nuevo: el administrador reactiva la tienda solo si la liquidación quedó saldada.</p>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <p><strong>Ciudad:</strong> {{ vendedor.ciudad }}, {{ vendedor.get_departamento_display }}</p>
+    <p><strong>Tipo:</strong> {{ vendedor.get_tipo_display }}</p>
+    <p><strong>Rango de precios:</strong> {{ vendedor.get_rango_precio_display }}
+      {% if vendedor.precio_hasta %}
+        · de ${{ vendedor.precio_desde }} a ${{ vendedor.precio_hasta }} COP
+      {% endif %}
+    </p>
+    <p><strong>Categorías:</strong>
+      {% for c in vendedor.categorias.all %}{{ c.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}Ninguna{% endfor %}
+    </p>
+    <p><strong>Comisión por pedido:</strong> {{ comision_pct }}% · plazo {{ dias_liquidacion }} días después del pago del cliente.</p>
+    <p><strong>Por liquidar ahora:</strong> ${{ deuda }} COP</p>
+    <a class="btn" href="{% url 'datos_vendedor' %}">Editar clasificación</a>
+    {% if vendedor.estado == "activo" %}
+      <a class="btn" href="{% url 'nuevo_producto' %}">Publicar producto</a>
+    {% endif %}
+    <a class="btn sec" href="{% url 'liquidar_comision' %}">Liquidar comisión</a>
+  </div>
+
+  {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}
+    <h3>Tiendas conectadas</h3>
+    <p class="muted">Ven tu precio al por mayor, las fotos y la ficha. El teléfono sigue oculto hasta que hacen un pedido.</p>
+    <table>
+      <tr><th>Tienda</th><th>Ciudad</th><th>Desde</th></tr>
+      {% for c in conexiones %}
+        <tr>
+          <td>{{ c.cliente.nombre_tienda }}</td>
+          <td>{{ c.cliente.ciudad }}</td>
+          <td>{{ c.creado|date:"d/m/Y" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3">Ninguna tienda se ha conectado todavía.</td></tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+
+  <h3>Productos</h3>
+  <table>
+    <tr><th>Producto</th><th>Categoría</th><th>Ciudad</th><th>Entrega</th><th>Precio</th><th>Stock</th><th></th></tr>
+    {% for p in productos %}
+      <tr>
+        <td>{{ p.titulo|truncatechars:50 }}{% if not p.activo %} · oculto{% endif %}</td>
+        <td>{{ p.categoria }}</td>
+        <td>{{ p.ciudad_despacho }}</td>
+        <td>{{ p.entrega_texto }}</td>
+        <td>${{ p.precio_final_cop }}</td>
+        <td>{{ p.stock }}</td>
+        <td>
+          <a href="{% url 'editar_producto' p.pk %}">Editar</a>
+          <a href="{% url 'estado_producto' p.pk %}">Publicar</a>
+          <form method="post" action="{% url 'ocultar_producto' p.pk %}" style="display:inline">{% csrf_token %}
+            <button class="btn sec" type="submit">{% if p.activo %}Ocultar{% else %}Mostrar{% endif %}</button>
+          </form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7">Aún no publicas productos.</td></tr>
+    {% endfor %}
+  </table>
+
+  <h3>Pedidos</h3>
+  <p class="muted">El pedido es el canal con el cliente. Ahí ves la entrega y se escriben. La comisión se consigna al Nequi de ERA shop y el comprobante se anexa en Liquidar.</p>
+  <table>
+    <tr><th>#</th><th>Producto</th><th>Cliente</th><th>Pago</th><th>Venta</th><th>Comisión {{ comision_pct }}%</th><th>Estado comisión</th><th></th></tr>
+    {% for p in pedidos %}
+      <tr>
+        <td>{{ p.id }}</td>
+        <td>{{ p.producto.titulo|truncatechars:40 }}</td>
+        <td>{{ p.cliente_nombre }}<br><small>{{ p.cliente_ciudad }} · {{ p.cantidad }} und.</small><br><a href="{% url 'conversacion_pedido' p.id %}">Abrir pedido</a></td>
+        <td>{{ p.get_estado_pago_display }}</td>
+        <td>${{ p.monto_cop }}</td>
+        <td>${{ p.comision_cop }}</td>
+        <td>
+          {{ p.get_estado_comision_display }}
+          {% if p.fecha_limite_comision and p.estado_comision == "pendiente" %}
+            <br><small>Vence {{ p.fecha_limite_comision|date:"d/m/Y H:i" }}</small>
+          {% endif %}
+        </td>
+        <td>
+          {% if p.estado != "fallido" and p.estado != "entregado" and p.estado_comision != "pagada" %}
+            <form method="post" action="{% url 'cancelar_pedido_vendedor' p.pk %}">
+              {% csrf_token %}
+              {% if p.estado_comision == "pendiente" or p.estado_comision == "reportada" %}
+                <label><input type="checkbox" name="acepto" value="1"> Acepto salir de la página si cancelo esta venta</label>
+              {% endif %}
+              <button class="btn sec" type="submit">Cancelar</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8">Sin pedidos.</td></tr>
+    {% endfor %}
+  </table>
+{% endblock %}

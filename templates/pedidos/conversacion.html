@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Pedido #{{ pedido.id }} · ERA shop{% endblock %}
+{% block content %}
+  <p class="kicker">Pedido #{{ pedido.id }} · {{ pedido.referencia_pago }}</p>
+  <h2>{{ pedido.producto.titulo }}</h2>
+  <p class="price">${{ pedido.monto_cop|floatformat:0|intcomma }} COP · {{ pedido.cantidad }} und.</p>
+  <p class="meta">Pago: {{ pedido.get_estado_pago_display }} · Pedido: {{ pedido.get_estado_display }}{% if pedido.tracking %} · Guía {{ pedido.tracking }}{% endif %}</p>
+  {% if pedido.vendedor %}
+    <p>Tienda: <strong>{{ pedido.vendedor.nombre_tienda }}</strong> · {{ pedido.vendedor.get_tipo_display }} · {{ pedido.vendedor.ciudad }}</p>
+  {% endif %}
+  <p class="note">Esta conversación es el canal. Las dudas, la entrega y el estado se hablan aquí, no por fuera.</p>
+  <p><a class="btn sec" href="{% url 'resumen_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar resumen</a></p>
+
+  {% if rol == "vendedor" or rol == "plataforma" %}
+    <div class="card">
+      <p><strong>Estado del pedido</strong></p>
+      {% if pedido.estado == "pendiente" %}
+        <form method="post">{% csrf_token %}
+          <button class="btn" name="accion" value="pagado" type="submit">Marcar pagado</button>
+        </form>
+      {% elif pedido.estado == "pagado" or pedido.estado == "comprado" or pedido.estado == "en_casillero" %}
+        <form method="post">{% csrf_token %}
+          <button class="btn" name="accion" value="empacado" type="submit">Marcar empacado</button>
+        </form>
+      {% elif pedido.estado == "empacado" %}
+        <form method="post">{% csrf_token %}
+          <label>Número de guía<input name="guia" required></label>
+          <button class="btn" name="accion" value="enviado" type="submit">Marcar enviado</button>
+        </form>
+      {% elif pedido.estado == "enviado" %}
+        <form method="post">{% csrf_token %}
+          <button class="btn" name="accion" value="entregado" type="submit">Marcar entregado</button>
+        </form>
+      {% else %}
+        <p class="muted">Este pedido ya está {{ pedido.get_estado_display|lower }}.</p>
+      {% endif %}
+      {% if reclamo %}
+        <p>Hay un {{ reclamo.get_tipo_display|lower }} abierto hasta {{ reclamo.fecha_limite|date:"d/m/Y" }}.</p>
+        <form method="post">{% csrf_token %}
+          <input type="hidden" name="accion" value="resolver">
+          <button class="btn" name="decision" value="aceptado" type="submit">Aceptar</button>
+          <button class="btn sec" name="decision" value="rechazado" type="submit">Rechazar</button>
+          <button class="btn sec" name="decision" value="cerrado" type="submit">Cerrar</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if rol == "cliente" and pedido.estado == "entregado" and pedido.vendedor and not calificacion %}
+    <form method="post" class="card" style="max-width:640px">{% csrf_token %}
+      <input type="hidden" name="accion" value="calificar">
+      <label>Calificación de la tienda
+        <select name="estrellas" required>
+          <option value="5">5 · Excelente</option>
+          <option value="4">4 · Buena</option>
+          <option value="3">3 · Regular</option>
+          <option value="2">2 · Mala</option>
+          <option value="1">1 · Muy mala</option>
+        </select>
+      </label>
+      <label>Comentario<textarea name="comentario" rows="2"></textarea></label>
+      <button class="btn" type="submit">Calificar</button>
+    </form>
+  {% elif calificacion %}
+    <p class="meta">Calificación: {{ calificacion.estrellas }} de 5{% if calificacion.comentario %} · {{ calificacion.comentario }}{% endif %}</p>
+  {% endif %}
+
+  {% if rol == "cliente" and not reclamo and pedido.estado != "fallido" %}
+    <form method="post" class="card" style="max-width:640px">{% csrf_token %}
+      <input type="hidden" name="accion" value="reclamo">
+      <label>Tipo
+        <select name="tipo">
+          <option value="reclamo">Reclamo</option>
+          {% if puede_devolver %}<option value="devolucion">Devolución ({{ dias_reclamo }} días después de la entrega)</option>{% endif %}
+        </select>
+      </label>
+      <label>Qué pasó<textarea name="motivo" rows="3" required></textarea></label>
+      <button class="btn sec" type="submit">Abrir en este pedido</button>
+    </form>
+  {% endif %}
+
+  {% if rol == "vendedor" or rol == "plataforma" %}
+    <div class="card">
+      <p><strong>Entrega</strong></p>
+      <p>{{ pedido.cliente_nombre }} · {{ pedido.cliente_telefono }}</p>
+      <p>{{ pedido.cliente_direccion }} · {{ pedido.cliente_ciudad }}</p>
+      {% if pedido.cliente_email %}<p>{{ pedido.cliente_email }}</p>{% endif %}
+      {% if pedido.variante %}<p>Variante: {{ pedido.variante }}</p>{% endif %}
+    </div>
+  {% endif %}
+
+  <div class="hilo">
+    {% for m in mensajes %}
+      <article class="burbuja {% if m.autor == rol %}mia{% endif %}">
+        <p class="kicker">{{ m.nombre }} · {{ m.creado|date:"d/m/Y H:i" }}</p>
+        <p>{{ m.texto|linebreaksbr }}</p>
+      </article>
+    {% empty %}
+      <p>Todavía no hay mensajes.</p>
+    {% endfor %}
+  </div>
+  <form method="post" class="card" style="max-width:640px">{% csrf_token %}
+    <input type="hidden" name="accion" value="mensaje">
+    <label>Mensaje<textarea name="texto" rows="3" required placeholder="Escribe aquí"></textarea></label>
+    <button class="btn" type="submit">Enviar</button>
+  </form>
+  <p><a class="btn sec" href="{% url 'pagar_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Ver pago</a></p>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% if contacto_visible and pedido.contacto_telefono %}
+  <div class="card" style="max-width:520px">
+    <h3>Contacto del vendedor</h3>
+    <p>Este pedido ya quedó hecho. El teléfono, WhatsApp, correo y dirección no se muestran en el catálogo.</p>
+    {% if pedido.vendedor %}<p>Tienda: <strong>{{ pedido.vendedor.nombre_tienda }}</strong></p>{% endif %}
+    <p>Responsable: {{ pedido.contacto_responsable }}</p>
+    <p>Teléfono: {{ pedido.contacto_telefono }}</p>
+    <p>WhatsApp: {{ pedido.contacto_whatsapp }}</p>
+    <p>Correo: {{ pedido.contacto_email }}</p>
+    <p>Dirección: {{ pedido.contacto_direccion }}</p>
+  </div>
+{% elif pedido.vendedor %}
+  <p class="aviso">El contacto del vendedor solo aparece en el navegador donde se hizo el pedido.</p>
+{% endif %}

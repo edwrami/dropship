@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Mayoristas e importadores · ERA shop{% endblock %}
+{% block content %}
+  <p class="kicker">Al por mayor</p>
+  <h2>Mayoristas e importadores</h2>
+  <p class="lede">Registra tu tienda, conéctate y abre la lista: precio al por mayor, fotos y especificaciones.</p>
+  <form class="filters-grid filters" method="get">
+    <label>Tipo
+      <select name="tipo">
+        <option value="">Mayoristas e importadores</option>
+        <option value="mayorista" {% if tipo == "mayorista" %}selected{% endif %}>Mayorista</option>
+        <option value="importador" {% if tipo == "importador" %}selected{% endif %}>Importador</option>
+      </select>
+    </label>
+    <label>Ciudad<input name="ciudad" value="{{ ciudad }}" placeholder="Ciudad del proveedor"></label>
+    <div><button class="btn" type="submit">Buscar</button></div>
+  </form>
+  <div class="catalog">
+    {% for p in proveedores %}
+      <article class="product">
+        <div class="body">
+          <p class="kicker">{{ p.get_tipo_display }}</p>
+          <h3>{{ p.nombre_tienda }}</h3>
+          <p class="meta">{{ p.ciudad }}{% if p.departamento %} · {{ p.departamento }}{% endif %}</p>
+          <p class="meta">{% for c in p.categorias.all %}{{ c.nombre }}{% if not forloop.last %} · {% endif %}{% empty %}Sin categorías publicadas{% endfor %}</p>
+          {% if cliente %}
+            {% if p.id in conectados %}
+              <a class="btn" href="{% url 'lista_mayorista' p.slug %}">Ver lista de precios</a>
+              <form method="post" action="{% url 'desconectar_proveedor' p.slug %}">{% csrf_token %}
+                <button class="btn sec" type="submit">Desconectar</button>
+              </form>
+            {% else %}
+              <form method="post" action="{% url 'conectar_proveedor' p.slug %}">{% csrf_token %}
+                <button class="btn" type="submit">Conectar</button>
+              </form>
+            {% endif %}
+          {% else %}
+            <a class="btn" href="{% url 'registro_cliente' %}">Registrar mi tienda</a>
+          {% endif %}
+        </div>
+      </article>
+    {% empty %}
+      <p>Todavía no hay mayoristas ni importadores activos con esta búsqueda.</p>
+    {% endfor %}
+  </div>
+{% endblock %}

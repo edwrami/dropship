@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Clasificación de {{ vendedor.nombre_tienda }}</h2>
+  <p class="muted">Ciudad, tipo y categorías quedan guardados para la búsqueda. El rango de precios lo calcula el programa con tus productos.</p>
+  <form method="post">{% csrf_token %}
+    {{ form.as_p }}
+    {% include "vendedores/_categorias.html" %}
+    <button class="btn" type="submit">Guardar clasificación</button>
+  </form>
+{% endblock %}

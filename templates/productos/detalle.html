@@ -1,0 +1,69 @@
+﻿{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ producto.titulo }} · ERA shop{% endblock %}
+{% block description %}{{ producto.titulo }} por ${{ producto.precio_final_cop|floatformat:0 }} COP en ERA shop.{% endblock %}
+{% block meta %}
+<meta property="og:site_name" content="ERA shop">
+<meta property="og:type" content="product">
+<meta property="og:title" content="{{ producto.titulo }}">
+<meta property="og:description" content="Pide en ERA shop · ${{ producto.precio_final_cop|floatformat:0 }} COP{% if producto.ciudad_despacho %} · {{ producto.ciudad_despacho }}{% endif %}">
+<meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{% url 'detalle_producto' producto.pk %}">
+{% if producto.fotos.all %}<meta property="og:image" content="{{ producto.fotos.all.0.url }}">{% elif producto.imagen %}<meta property="og:image" content="{{ producto.imagen }}">{% endif %}
+{% endblock %}
+{% block content %}
+<article class="layout">
+  <div class="photo">
+    {% include "productos/_slider.html" %}
+  </div>
+  <div>
+    <p class="kicker">{% if producto.rubro %}{{ producto.rubro.padre.nombre }} · {{ producto.rubro.nombre }}{% elif producto.categoria %}{{ producto.categoria }}{% else %}ERA shop{% endif %}</p>
+    <h2>{{ producto.titulo }}</h2>
+    <p class="price">Mostrador ${{ producto.precio_final_cop|floatformat:0|intcomma }} COP</p>
+    {% if ve_mayor %}
+      <p class="price">Al por mayor ${{ producto.precio_mayor_cop|floatformat:0|intcomma }} COP · mínimo {{ producto.cantidad_minima }}{% if producto.unidad_empaque %} · {{ producto.unidad_empaque }}{% endif %}</p>
+    {% elif producto.precio_mayor_cop %}
+      <p class="note">Hay precio al por mayor{% if producto.cantidad_minima %} desde {{ producto.cantidad_minima }} unidades{% endif %}. <a href="{% url 'proveedores_mayor' %}">Registra tu tienda y conéctate</a> para verlo.</p>
+    {% endif %}
+    {% if producto.vendedor %}
+      <p>Vendido por <a href="{% url 'tienda_publica' producto.vendedor.slug %}"><strong>{{ producto.vendedor.nombre_tienda }}</strong></a>
+        · {{ producto.vendedor.get_tipo_display }}
+        {% if producto.ciudad_despacho %} · {{ producto.ciudad_despacho }}{% endif %}
+      </p>
+      <p class="note">Cuando haces el pedido, la conversación queda en esa ficha. No se habla por fuera de la página.</p>
+    {% endif %}
+    <ul class="specs">
+      {% if producto.marca %}<li>Marca: {{ producto.marca }}</li>{% endif %}
+      <li>Condición: {{ producto.get_condicion_display }}</li>
+      {% if producto.material %}<li>Material: {{ producto.material }}</li>{% endif %}
+      {% if producto.color %}<li>Color: {{ producto.color }}</li>{% endif %}
+      {% if producto.talla %}<li>Talla: {{ producto.talla }}</li>{% endif %}
+      {% if producto.entrega_texto %}<li>Entrega: {{ producto.entrega_texto }}</li>{% endif %}
+      <li>{% if producto.envio_gratis %}Envío gratis{% else %}Envío ${{ producto.costo_envio_cop|floatformat:0|intcomma }}{% endif %}</li>
+      {% if producto.garantia_dias %}<li>Garantía: {{ producto.garantia_dias }} días</li>{% endif %}
+      {% if producto.controla_stock %}<li>Disponibles: {{ producto.stock }}</li>{% endif %}
+    </ul>
+    {% if producto.descripcion %}{{ producto.descripcion|linebreaks }}{% endif %}
+
+    {% if vendedor_actual and producto.vendedor_id == vendedor_actual.id %}
+      <h3>Publicar este producto</h3>
+      <p class="muted">El enlace abre esta ficha para que el cliente pida. En el celular, “estados” arma la imagen y la manda a WhatsApp, Instagram o Facebook.</p>
+      {% include "compartir/_botones.html" with titulo_share=producto.titulo texto_share="Pide esto en ERA shop" url_share=request.path precio_share=producto.precio_final_cop kicker_share=producto.vendedor.nombre_tienda %}
+      <a class="btn sec" href="{% url 'estado_producto' producto.pk %}">Vista de estado</a>
+    {% endif %}
+
+    <h3>Hacer pedido</h3>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post" action="{% url 'crear_pedido' producto.pk %}">
+      {% csrf_token %}
+      <label>Cantidad<input name="cantidad" type="number" min="1" max="20" value="1"></label>
+      <label>Variante<input name="variante" placeholder="Talla, color u otra variante"></label>
+      <label>Tu nombre<input name="nombre" required></label>
+      <label>Tu teléfono<input name="telefono" required></label>
+      <label>Correo<input name="email" type="email"></label>
+      <label>Dirección de entrega<textarea name="direccion" required></textarea></label>
+      <label>Ciudad<input name="ciudad" required></label>
+      <button class="btn" type="submit">Hacer pedido y pagar</button>
+    </form>
+  </div>
+</article>
+{% endblock %}

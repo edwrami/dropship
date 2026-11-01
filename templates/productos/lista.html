@@ -1,0 +1,131 @@
+﻿{% extends "base.html" %}
+{% load humanize %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Marketplace</p>
+    <h1>ERA shop</h1>
+    <p class="lede">Encuentra la mercancía y pide en la página. La conversación con la tienda queda dentro del pedido. Si tienes tienda, entra a <a href="{% url 'proveedores_mayor' %}">mayoristas e importadores</a>.</p>
+  </div>
+  <aside class="hero-card">
+    <p>Hoy en el catálogo</p>
+    <strong>{% if total == 1 %}1 producto{% else %}{{ total }} productos{% endif %}</strong>
+    <p>Ciudad, precio, entrega y tipo de vendedor en un solo filtro.</p>
+  </aside>
+</section>
+
+<details class="filters" open>
+  <summary>Buscar</summary>
+  <form class="filters-grid" method="get">
+    <label>Palabra<input name="q" value="{{ request.GET.q }}" placeholder="Nombre, marca, ciudad"></label>
+    <label>Categoría
+      <select name="categoria">
+        <option value="">Todas</option>
+        {% for g in grupos %}
+          <option value="{{ g.id }}" {% if request.GET.categoria == g.id|stringformat:"s" %}selected{% endif %}>{{ g.nombre }}</option>
+          {% for h in g.hijos.all %}
+            <option value="{{ h.id }}" {% if request.GET.categoria == h.id|stringformat:"s" %}selected{% endif %}>— {{ h.nombre }}</option>
+          {% endfor %}
+        {% endfor %}
+      </select>
+    </label>
+    <label>Ciudad<input name="ciudad" value="{{ request.GET.ciudad }}" placeholder="Ciudad de despacho"></label>
+    <label>Departamento
+      <select name="departamento">
+        <option value="">Todos</option>
+        {% for d in departamentos %}
+          <option value="{{ d }}" {% if request.GET.departamento == d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Tipo de vendedor
+      <select name="tipo">
+        <option value="">Todos</option>
+        {% for clave, nombre in tipos %}
+          <option value="{{ clave }}" {% if request.GET.tipo == clave %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Rango de precio
+      <select name="rango">
+        <option value="">Todos</option>
+        {% for clave, nombre in rangos %}
+          <option value="{{ clave }}" {% if request.GET.rango == clave %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Precio mínimo<input name="precio_min" value="{{ request.GET.precio_min }}" inputmode="numeric"></label>
+    <label>Precio máximo<input name="precio_max" value="{{ request.GET.precio_max }}" inputmode="numeric"></label>
+    <label>Condición
+      <select name="condicion">
+        <option value="">Todas</option>
+        {% for clave, nombre in condiciones %}
+          <option value="{{ clave }}" {% if request.GET.condicion == clave %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Entrega
+      <select name="entrega">
+        <option value="">Cualquiera</option>
+        {% for dias, nombre in entregas %}
+          <option value="{{ dias }}" {% if request.GET.entrega == dias|stringformat:"s" %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Marca<input name="marca" value="{{ request.GET.marca }}"></label>
+    <label>Color<input name="color" value="{{ request.GET.color }}"></label>
+    <label>Talla<input name="talla" value="{{ request.GET.talla }}"></label>
+    <label>Orden
+      <select name="orden">
+        <option value="recientes" {% if not request.GET.orden or request.GET.orden == "recientes" %}selected{% endif %}>Más recientes</option>
+        <option value="precio_asc" {% if request.GET.orden == "precio_asc" %}selected{% endif %}>Menor precio</option>
+        <option value="precio_desc" {% if request.GET.orden == "precio_desc" %}selected{% endif %}>Mayor precio</option>
+        <option value="entrega" {% if request.GET.orden == "entrega" %}selected{% endif %}>Entrega más rápida</option>
+      </select>
+    </label>
+    <div class="checks">
+      <label><input type="checkbox" name="envio" value="1" {% if request.GET.envio == "1" %}checked{% endif %}> Envío gratis</label>
+      <label><input type="checkbox" name="garantia" value="1" {% if request.GET.garantia == "1" %}checked{% endif %}> Con garantía</label>
+    </div>
+    <div>
+      <button class="btn" type="submit">Buscar</button>
+      <a class="btn sec" href="{% url 'lista_productos' %}">Limpiar</a>
+    </div>
+  </form>
+</details>
+
+<div class="catalog">
+  {% for p in productos %}
+    <article class="product">
+      <a class="media" href="{% url 'detalle_producto' p.pk %}">
+        {% if p.fotos.all %}<img src="{{ p.fotos.all.0.url }}" alt="">{% elif p.imagen %}<img src="{{ p.imagen }}" alt="">{% endif %}
+      </a>
+      <div class="body">
+        <p class="kicker">{% if p.rubro %}{{ p.rubro.nombre }}{% elif p.categoria %}{{ p.categoria }}{% else %}ERA shop{% endif %}</p>
+        <h3>{{ p.titulo|truncatechars:64 }}</h3>
+        <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
+        <p class="meta">
+          {% if p.ciudad_despacho %}{{ p.ciudad_despacho }}{% endif %}
+          {% if p.entrega_texto %} · {{ p.entrega_texto }}{% endif %}
+          {% if p.envio_gratis %} · Envío gratis{% endif %}
+          {% if p.vendedor %}<br>{{ p.vendedor.nombre_tienda }}{% endif %}
+        </p>
+        <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir</a>
+      </div>
+    </article>
+  {% empty %}
+    <p>No hay productos con esos filtros.</p>
+  {% endfor %}
+</div>
+{% if productos.has_other_pages %}
+  <p>
+    {% if productos.has_previous %}
+      <a class="btn sec" href="?{% if filtros_qs %}{{ filtros_qs }}&{% endif %}page={{ productos.previous_page_number }}">Anterior</a>
+    {% endif %}
+    Página {{ productos.number }} de {{ productos.paginator.num_pages }}
+    {% if productos.has_next %}
+      <a class="btn sec" href="?{% if filtros_qs %}{{ filtros_qs }}&{% endif %}page={{ productos.next_page_number }}">Siguiente</a>
+    {% endif %}
+  </p>
+{% endif %}
+{% endblock %}

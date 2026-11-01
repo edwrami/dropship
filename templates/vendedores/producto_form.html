@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>{% if producto %}Editar producto{% else %}Publicar producto{% endif %}</h2>
+  <p class="muted">Completa la ficha: categoría, descripción, ciudad, precio y tiempo de entrega. El cliente no ve tu costo ni tu teléfono.</p>
+  <form method="post" enctype="multipart/form-data" style="max-width:720px">{% csrf_token %}
+    {{ form.as_p }}
+    <fieldset>
+      <legend>Fotos del producto</legend>
+      <p class="muted">De 1 a 3 fotos JPG, PNG o WEBP, de máximo 5 MB cada una. En la ficha se deslizan para ver la siguiente.</p>
+      {% if producto and producto.fotos.all %}
+        <div class="thumbs">
+          {% for foto in producto.fotos.all %}
+            <img src="{{ foto.url }}" alt="Foto {{ forloop.counter }}">
+          {% endfor %}
+        </div>
+        <p class="muted">Si eliges fotos nuevas, reemplazan estas.</p>
+      {% endif %}
+      <input type="file" name="fotos" accept="image/jpeg,image/png,image/webp" multiple>
+    </fieldset>
+    <p><button class="btn" type="submit">Guardar y publicar</button></p>
+  </form>
+{% endblock %}

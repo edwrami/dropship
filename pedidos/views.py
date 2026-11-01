@@ -1,0 +1,686 @@
+﻿import json
+import uuid
+from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+
+from django.conf import settings
+from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import Count, Q, Sum
+from django.http import Http404, HttpResponse, HttpResponseBadRequest
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+from productos.models import Producto
+from vendedores.forms import _nequi_valido
+from vendedores.opciones import TIPOS
+from vendedores.services import activar_cobro_comision, aplicar_comision
+
+from .avisos import avisar_estado, avisar_mensaje, avisar_pedido_nuevo
+from .models import Calificacion, CuentaPlataforma, MensajePedido, Pedido, Reclamo
+from .resumen import pdf_pedido
+from .services import wompi
+
+
+def _suma_comision(estado):
+    valor = Pedido.objects.filter(estado_comision=estado).aggregate(s=Sum("comision_cop"))["s"]
+    return valor or 0
+
+
+def nequi_plataforma():
+    cuenta = CuentaPlataforma.objects.order_by("id").first()
+    if cuenta and cuenta.nequi:
+        return cuenta.nequi, cuenta.titular or "ERA shop"
+    return getattr(settings, "PAGO_NEQUI", "") or "", "ERA shop"
+
+
+def lista_pedidos(request):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        from django.contrib.auth.views import redirect_to_login
+        return redirect_to_login(request.get_full_path(), login_url="/admin/login/")
+    return _registro_ventas(request)
+
+
+def _marcar_contacto(request, pedido):
+    ids = request.session.get("pedidos_contacto", [])
+    if pedido.id not in ids:
+        ids.append(pedido.id)
+        request.session["pedidos_contacto"] = ids
+
+
+def contacto_visible(request, pedido):
+    if not pedido or not pedido.vendedor_id:
+        return False
+    clave = (request.GET.get("clave") or "").strip()
+    if clave and clave == pedido.clave_contacto:
+        _marcar_contacto(request, pedido)
+        return True
+    return pedido.id in request.session.get("pedidos_contacto", [])
+
+
+def crear_pedido(request, producto_id):
+    if request.method != "POST":
+        return redirect("detalle_producto", producto_id)
+
+    try:
+        cantidad = int(request.POST.get("cantidad") or 1)
+    except ValueError:
+        cantidad = 1
+    if cantidad < 1:
+        cantidad = 1
+    if cantidad > 999:
+        cantidad = 999
+
+    nombre = (request.POST.get("nombre") or "").strip()
+    telefono = (request.POST.get("telefono") or "").strip()
+    direccion = (request.POST.get("direccion") or "").strip()
+    ciudad = (request.POST.get("ciudad") or "").strip()
+
+    with transaction.atomic():
+        producto = get_object_or_404(
+            Producto.objects.select_for_update(),
+            pk=producto_id,
+            activo=True,
+        )
+        if producto.vendedor_id and producto.vendedor.estado != "activo":
+            raise Http404("Producto no disponible")
+
+        def _error(msg):
+            return render(request, "productos/detalle.html", {"producto": producto, "error": msg})
+
+        if not all([nombre, telefono, direccion, ciudad]):
+            return _error("Completa nombre, teléfono, dirección y ciudad.")
+        if producto.controla_stock and producto.stock < cantidad:
+            return _error("No hay suficientes unidades.")
+
+        precio = Decimal(producto.precio_final_cop)
+        if producto.precio_mayor_cop and producto.vendedor_id and request.user.is_authenticated:
+            from vendedores.models import ClienteTienda, Conexion
+            try:
+                cliente = request.user.cliente_tienda
+            except ClienteTienda.DoesNotExist:
+                cliente = None
+            minimo = producto.cantidad_minima or 1
+            if (
+                cliente
+                and cantidad >= minimo
+                and Conexion.objects.filter(cliente=cliente, proveedor_id=producto.vendedor_id).exists()
+            ):
+                precio = Decimal(producto.precio_mayor_cop)
+            elif cantidad > 20:
+                return _error("En mostrador el máximo por pedido es 20. El precio al por mayor aplica si tu tienda está conectada y pides el mínimo.")
+        elif cantidad > 20:
+            cantidad = 20
+            precio = Decimal(producto.precio_final_cop)
+        envio = Decimal("0")
+        if not producto.envio_gratis:
+            envio = Decimal(producto.costo_envio_cop or 0)
+        subtotal = (precio * cantidad + envio).quantize(
+            Decimal("1"), rounding=ROUND_HALF_UP,
+        )
+        vendedor = producto.vendedor
+        cliente_tienda = None
+        if request.user.is_authenticated:
+            from vendedores.models import ClienteTienda
+            try:
+                cliente_tienda = request.user.cliente_tienda
+            except ClienteTienda.DoesNotExist:
+                cliente_tienda = None
+        pedido = Pedido.objects.create(
+            producto=producto,
+            vendedor=vendedor,
+            cliente_tienda=cliente_tienda,
+            variante=request.POST.get("variante", ""),
+            cantidad=cantidad,
+            cliente_nombre=nombre,
+            cliente_telefono=telefono,
+            cliente_email=(request.POST.get("email") or "").strip(),
+            cliente_direccion=direccion,
+            cliente_ciudad=ciudad,
+            monto_cop=subtotal,
+            estado="pendiente",
+            estado_pago="pendiente",
+            contacto_responsable=vendedor.responsable if vendedor else "",
+            contacto_telefono=vendedor.telefono if vendedor else "",
+            contacto_whatsapp=vendedor.whatsapp if vendedor else "",
+            contacto_email=vendedor.user.email if vendedor else "",
+            contacto_direccion=vendedor.direccion if vendedor else "",
+            contacto_nequi=vendedor.nequi if vendedor else "",
+            clave_contacto=uuid.uuid4().hex,
+        )
+        extra = (pedido.id % 89) + 1
+        pedido.monto_cop = subtotal + extra
+        pedido.referencia_pago = f"PED-{pedido.id}"
+        aplicar_comision(pedido)
+        pedido.save()
+        MensajePedido.objects.create(
+            pedido=pedido,
+            autor="plataforma",
+            nombre="ERA shop",
+            texto=(
+                "Pedido creado. Esta conversación es el canal entre la tienda y el cliente: "
+                "dudas, entrega y estado van aquí, no por WhatsApp ni por teléfono."
+            ),
+        )
+        if producto.controla_stock:
+            producto.stock -= cantidad
+            producto.save(update_fields=["stock"])
+
+    _marcar_contacto(request, pedido)
+    avisar_pedido_nuevo(
+        pedido,
+        request.build_absolute_uri(f"/pedidos/{pedido.id}/?clave={pedido.clave_contacto}"),
+        request.build_absolute_uri(f"/pedidos/{pedido.id}/"),
+    )
+    return redirect(f"/pedidos/pagar/{pedido.id}/?clave={pedido.clave_contacto}")
+
+
+def pagar_pedido(request, pedido_id):
+    pedido = get_object_or_404(Pedido, pk=pedido_id)
+    if pedido.estado_pago == "aprobado":
+        return render(request, "pedidos/gracias.html", {
+            "pedido": pedido,
+            "pagado": True,
+            "contacto_visible": contacto_visible(request, pedido),
+        })
+    if request.method == "POST":
+        return _reportar_pago_directo(request, pedido)
+    ctx = _ctx_pago(pedido, request)
+    ctx["contacto_visible"] = contacto_visible(request, pedido)
+    return render(request, "pedidos/pagar.html", ctx)
+
+
+def _reportar_pago_directo(request, pedido):
+    metodo = (request.POST.get("metodo") or "nequi").strip()[:40]
+    comp = (request.POST.get("comprobante") or "").strip()[:120]
+    if not comp:
+        return render(
+            request,
+            "pedidos/pagar.html",
+            {
+                **_ctx_pago(pedido, request),
+                "error": "Pega el número o ID de la transferencia.",
+                "contacto_visible": contacto_visible(request, pedido),
+            },
+        )
+    pedido.metodo_pago = metodo
+    pedido.comprobante = comp
+    pedido.estado_pago = "reportado"
+    pedido.notas = f"Pago directo {metodo}. Comprobante: {comp}"
+    pedido.save()
+    activar_cobro_comision(pedido)
+    return render(
+        request,
+        "pedidos/gracias.html",
+        {
+            "pedido": pedido,
+            "pagado": False,
+            "reportado": True,
+            "contacto_visible": contacto_visible(request, pedido),
+        },
+    )
+
+
+def _ctx_pago(pedido, request=None):
+    from django.urls import reverse
+
+    from .services import wompi
+
+    if pedido.vendedor_id:
+        nequi_numero = pedido.contacto_nequi or ""
+        nequi_nombre = pedido.vendedor.nombre_tienda
+    else:
+        nequi_numero = getattr(settings, "PAGO_NEQUI", "") or ""
+        nequi_nombre = "ERA shop"
+    ctx = {
+        "pedido": pedido,
+        "nequi_numero": nequi_numero,
+        "nequi_nombre": nequi_nombre,
+        "tarjeta_lista": wompi.checkout_listo(),
+    }
+    if request is not None and ctx["tarjeta_lista"]:
+        destino = request.build_absolute_uri(reverse("resultado_pago", args=[pedido.id]))
+        ctx["wompi"] = wompi.contexto_widget(pedido, destino)
+    return ctx
+
+
+def resultado_pago(request, pedido_id):
+    pedido = get_object_or_404(Pedido, pk=pedido_id)
+    return render(
+        request,
+        "pedidos/gracias.html",
+        {
+            "pedido": pedido,
+            "pagado": pedido.estado_pago == "aprobado",
+            "reportado": pedido.estado_pago == "reportado",
+            "esperando": pedido.estado_pago == "pendiente",
+            "contacto_visible": contacto_visible(request, pedido),
+        },
+    )
+
+
+@csrf_exempt
+@require_POST
+def wompi_evento(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("json")
+    checksum = (payload.get("signature") or {}).get("checksum") or ""
+    if not wompi.evento_valido(payload, checksum):
+        return HttpResponseBadRequest("firma")
+    tx = wompi.extraer_transaccion(payload)
+    ref = (tx.get("reference") or "").strip()
+    if not ref:
+        return HttpResponse("ok")
+    pedido = Pedido.objects.filter(referencia_pago=ref).first()
+    if not pedido:
+        return HttpResponse("ok")
+    _aplicar_transaccion(pedido, tx)
+    return HttpResponse("ok")
+
+
+def _aplicar_transaccion(pedido, tx):
+    status = (tx.get("status") or "").upper()
+    pedido.wompi_id = tx.get("id") or pedido.wompi_id
+    pedido.metodo_pago = tx.get("payment_method_type") or pedido.metodo_pago
+    if status == "APPROVED":
+        ya_pagado = pedido.estado_pago == "aprobado"
+        pedido.estado_pago = "aprobado"
+        if pedido.estado == "pendiente":
+            pedido.estado = "pagado"
+        pedido.save()
+        activar_cobro_comision(pedido)
+        if not ya_pagado:
+            try:
+                from productos.tasks import procesar_pedido
+                procesar_pedido(pedido.id)
+            except Exception as e:
+                pedido.notas = f"Pagado. Error al comprar al proveedor: {e}"
+                pedido.save(update_fields=["notas"])
+    elif status in ("DECLINED", "VOIDED"):
+        pedido.estado_pago = "declinado"
+        pedido.save()
+    elif status == "ERROR":
+        pedido.estado_pago = "error"
+        pedido.save()
+    else:
+        pedido.save()
+
+
+def _rol_pedido(request, pedido):
+    if request.user.is_authenticated and request.user.is_staff:
+        return "plataforma"
+    if request.user.is_authenticated:
+        from vendedores.models import ClienteTienda, Vendedor
+        try:
+            if request.user.vendedor.id == pedido.vendedor_id:
+                return "vendedor"
+        except Vendedor.DoesNotExist:
+            pass
+        try:
+            if request.user.cliente_tienda.id == pedido.cliente_tienda_id:
+                return "cliente"
+        except ClienteTienda.DoesNotExist:
+            pass
+    if contacto_visible(request, pedido):
+        return "cliente"
+    return None
+
+
+def _paso_pedido(estado):
+    return {
+        "pendiente": 0,
+        "pagado": 1,
+        "comprado": 1,
+        "en_casillero": 1,
+        "empacado": 2,
+        "enviado": 3,
+        "entregado": 4,
+        "fallido": -1,
+    }.get(estado, 0)
+
+
+def _enlaces_pedido(request, pedido):
+    cliente = request.build_absolute_uri(f"/pedidos/{pedido.id}/?clave={pedido.clave_contacto}")
+    tienda = request.build_absolute_uri(f"/pedidos/{pedido.id}/")
+    return cliente, tienda
+
+
+def _nombre_autor(pedido, rol):
+    if rol == "vendedor" and pedido.vendedor_id:
+        return pedido.vendedor.nombre_tienda
+    if rol == "plataforma":
+        return "ERA shop"
+    return pedido.cliente_nombre
+
+
+def conversacion_pedido(request, pedido_id):
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("producto", "vendedor", "cliente_tienda"),
+        pk=pedido_id,
+    )
+    rol = _rol_pedido(request, pedido)
+    if rol is None:
+        raise Http404("Pedido no disponible")
+    if request.method == "POST":
+        accion = request.POST.get("accion") or "mensaje"
+        if accion in ("pagado", "empacado", "enviado", "entregado"):
+            _marcar_estado(request, pedido, rol, accion)
+        elif accion == "calificar":
+            _calificar(request, pedido, rol)
+        elif accion == "reclamo":
+            _abrir_reclamo(request, pedido, rol)
+        elif accion == "resolver":
+            _resolver_reclamo(request, pedido, rol)
+        else:
+            _publicar_mensaje(request, pedido, rol)
+        return redirect(request.get_full_path())
+    try:
+        calificacion = pedido.calificacion
+    except Calificacion.DoesNotExist:
+        calificacion = None
+    abierto = pedido.reclamos.filter(estado="abierto").first()
+    return render(request, "pedidos/conversacion.html", {
+        "pedido": pedido,
+        "mensajes": pedido.mensajes.all(),
+        "rol": rol,
+        "calificacion": calificacion,
+        "reclamo": abierto,
+        "reclamos": pedido.reclamos.all(),
+        "dias_reclamo": settings.DIAS_RECLAMO,
+        "puede_devolver": _puede_devolver(pedido),
+    })
+
+
+def resumen_pedido(request, pedido_id):
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("producto", "vendedor"),
+        pk=pedido_id,
+    )
+    if _rol_pedido(request, pedido) is None:
+        raise Http404("Pedido no disponible")
+    archivo = pdf_pedido(pedido)
+    respuesta = HttpResponse(archivo, content_type="application/pdf")
+    respuesta["Content-Disposition"] = f'attachment; filename="pedido-{pedido.id}.pdf"'
+    return respuesta
+
+
+def _publicar_mensaje(request, pedido, rol):
+    texto = (request.POST.get("texto") or "").strip()
+    if not texto:
+        messages.error(request, "Escribe el mensaje.")
+        return
+    if len(texto) > 2000:
+        messages.error(request, "El mensaje es demasiado largo.")
+        return
+    MensajePedido.objects.create(
+        pedido=pedido, autor=rol, nombre=_nombre_autor(pedido, rol), texto=texto,
+    )
+    cliente, tienda = _enlaces_pedido(request, pedido)
+    avisar_mensaje(pedido, rol, cliente, tienda)
+
+
+def _marcar_estado(request, pedido, rol, accion):
+    if rol not in ("vendedor", "plataforma"):
+        messages.error(request, "Solo la tienda actualiza el estado del pedido.")
+        return
+    if pedido.estado == "fallido":
+        messages.error(request, "Ese pedido está cerrado.")
+        return
+    paso = _paso_pedido(pedido.estado)
+    if accion == "pagado" and paso < 1:
+        pedido.estado = "pagado"
+        pedido.estado_pago = "aprobado"
+        pedido.save(update_fields=["estado", "estado_pago"])
+        activar_cobro_comision(pedido)
+        nota = "La tienda marcó el pedido como pagado."
+    elif accion == "empacado" and paso == 1:
+        pedido.estado = "empacado"
+        pedido.save(update_fields=["estado"])
+        nota = "La tienda empacó el pedido."
+    elif accion == "enviado" and paso == 2:
+        guia = (request.POST.get("guia") or "").strip()[:200]
+        if not guia:
+            messages.error(request, "Escribe el número de guía para marcarlo enviado.")
+            return
+        pedido.estado = "enviado"
+        pedido.tracking = guia
+        pedido.save(update_fields=["estado", "tracking"])
+        nota = f"La tienda envió el pedido. Guía {guia}."
+    elif accion == "entregado" and paso == 3:
+        pedido.estado = "entregado"
+        pedido.entregado_en = timezone.now()
+        pedido.save(update_fields=["estado", "entregado_en"])
+        nota = "La tienda marcó el pedido como entregado. Tienes 5 días para una devolución y para calificar."
+    else:
+        messages.error(request, "Ese paso no corresponde al estado actual del pedido.")
+        return
+    MensajePedido.objects.create(pedido=pedido, autor="plataforma", nombre="ERA shop", texto=nota)
+    cliente, _tienda = _enlaces_pedido(request, pedido)
+    avisar_estado(pedido, nota, cliente)
+    messages.success(request, nota)
+
+
+def _calificar(request, pedido, rol):
+    if rol != "cliente":
+        messages.error(request, "Califica quien hizo el pedido.")
+        return
+    if pedido.estado != "entregado" or not pedido.vendedor_id:
+        messages.error(request, "La calificación se abre cuando el pedido está entregado.")
+        return
+    if Calificacion.objects.filter(pedido=pedido).exists():
+        messages.error(request, "Este pedido ya tiene calificación.")
+        return
+    try:
+        estrellas = int(request.POST.get("estrellas") or 0)
+    except ValueError:
+        estrellas = 0
+    if estrellas < 1 or estrellas > 5:
+        messages.error(request, "Elige de 1 a 5 estrellas.")
+        return
+    comentario = (request.POST.get("comentario") or "").strip()[:500]
+    Calificacion.objects.create(
+        pedido=pedido, vendedor=pedido.vendedor, estrellas=estrellas, comentario=comentario,
+    )
+    messages.success(request, "Calificación guardada.")
+
+
+def _puede_devolver(pedido):
+    if pedido.estado != "entregado" or not pedido.entregado_en:
+        return False
+    if pedido.reclamos.filter(estado="abierto").exists():
+        return False
+    return timezone.now() <= pedido.entregado_en + timedelta(days=settings.DIAS_RECLAMO)
+
+
+def _abrir_reclamo(request, pedido, rol):
+    if rol != "cliente":
+        messages.error(request, "El reclamo lo abre quien hizo el pedido.")
+        return
+    if pedido.reclamos.filter(estado="abierto").exists():
+        messages.error(request, "Ya hay un reclamo abierto en este pedido.")
+        return
+    tipo = request.POST.get("tipo") or "reclamo"
+    if tipo not in ("reclamo", "devolucion"):
+        tipo = "reclamo"
+    motivo = (request.POST.get("motivo") or "").strip()
+    if len(motivo) < 20:
+        messages.error(request, "Cuenta el reclamo con al menos 20 caracteres.")
+        return
+    if tipo == "devolucion" and not _puede_devolver(pedido):
+        messages.error(request, f"La devolución solo está abierta {settings.DIAS_RECLAMO} días después de la entrega.")
+        return
+    if pedido.estado == "fallido":
+        messages.error(request, "Ese pedido está cerrado.")
+        return
+    limite = timezone.now() + timedelta(days=settings.DIAS_RECLAMO)
+    Reclamo.objects.create(pedido=pedido, tipo=tipo, motivo=motivo[:2000], fecha_limite=limite)
+    texto = f"Se abrió un {('reclamo' if tipo == 'reclamo' else 'solicitud de devolución')}. La tienda tiene {settings.DIAS_RECLAMO} días para responder aquí."
+    MensajePedido.objects.create(pedido=pedido, autor="plataforma", nombre="ERA shop", texto=texto)
+    cliente, tienda = _enlaces_pedido(request, pedido)
+    avisar_mensaje(pedido, "cliente", cliente, tienda)
+    messages.success(request, "Quedó abierto en el pedido.")
+
+
+def _resolver_reclamo(request, pedido, rol):
+    if rol not in ("vendedor", "plataforma"):
+        messages.error(request, "La tienda responde el reclamo.")
+        return
+    reclamo = pedido.reclamos.filter(estado="abierto").first()
+    if reclamo is None:
+        messages.error(request, "No hay un reclamo abierto.")
+        return
+    decision = request.POST.get("decision") or ""
+    if decision not in ("aceptado", "rechazado", "cerrado"):
+        messages.error(request, "Elige si lo aceptas, lo rechazas o lo cierras.")
+        return
+    reclamo.estado = decision
+    reclamo.save(update_fields=["estado"])
+    nota = f"La tienda marcó el {reclamo.get_tipo_display().lower()} como {reclamo.get_estado_display().lower()}."
+    MensajePedido.objects.create(pedido=pedido, autor="plataforma", nombre="ERA shop", texto=nota)
+    cliente, _tienda = _enlaces_pedido(request, pedido)
+    avisar_estado(pedido, nota, cliente)
+    messages.success(request, nota)
+
+
+def _decimal_get(valor):
+    try:
+        return Decimal(str(valor).replace(",", "").strip())
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _registro_ventas(request):
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+        if accion == "nequi":
+            try:
+                numero = _nequi_valido(request.POST.get("nequi") or "")
+            except ValidationError as exc:
+                messages.error(request, exc.messages[0])
+            else:
+                cuenta, _ = CuentaPlataforma.objects.get_or_create(pk=1)
+                cuenta.nequi = numero
+                cuenta.titular = (request.POST.get("titular") or "ERA shop").strip()[:120]
+                cuenta.save()
+                messages.success(request, "Nequi de comisiones guardado. Los vendedores lo ven al liquidar.")
+        elif accion == "wompi":
+            cuenta, _ = CuentaPlataforma.objects.get_or_create(pk=1)
+            publica = (request.POST.get("wompi_publica") or "").strip()
+            integridad = (request.POST.get("wompi_integridad") or "").strip()
+            eventos = (request.POST.get("wompi_eventos") or "").strip()
+            if publica:
+                cuenta.wompi_publica = publica[:200]
+            if integridad:
+                cuenta.wompi_integridad = integridad[:200]
+            if eventos:
+                cuenta.wompi_eventos = eventos[:200]
+            if not (publica or integridad or eventos):
+                messages.error(request, "Pega al menos la llave pública de Wompi.")
+            else:
+                cuenta.save()
+                messages.success(request, "Wompi guardado. El botón de tarjeta ya puede cobrar.")
+        else:
+            pedido = get_object_or_404(Pedido, pk=request.POST.get("pedido") or 0)
+            if accion == "confirmar" and pedido.estado_comision in ("pendiente", "reportada"):
+                pedido.estado_comision = "pagada"
+                pedido.comision_pagada_en = timezone.now()
+                pedido.save(update_fields=["estado_comision", "comision_pagada_en"])
+                messages.success(request, f"Comisión del pedido #{pedido.id} confirmada.")
+            elif accion == "rechazar" and pedido.estado_comision == "reportada":
+                pedido.estado_comision = "pendiente"
+                pedido.fecha_limite_comision = timezone.now() + timedelta(days=2)
+                pedido.comprobante_comision = ""
+                pedido.comprobante_url = ""
+                pedido.comprobante_ruta = ""
+                pedido.save(update_fields=[
+                    "estado_comision", "fecha_limite_comision",
+                    "comprobante_comision", "comprobante_url", "comprobante_ruta",
+                ])
+                messages.error(request, f"Comprobante del pedido #{pedido.id} rechazado. Tienen 2 días.")
+        cola = request.GET.urlencode()
+        return redirect(request.path + (f"?{cola}" if cola else ""))
+
+    qs = Pedido.objects.select_related("producto", "vendedor", "cliente_tienda")
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        qs = qs.filter(
+            Q(cliente_nombre__icontains=q)
+            | Q(cliente_telefono__icontains=q)
+            | Q(cliente_email__icontains=q)
+            | Q(cliente_ciudad__icontains=q)
+            | Q(cliente_direccion__icontains=q)
+            | Q(referencia_pago__icontains=q)
+            | Q(producto__titulo__icontains=q)
+            | Q(vendedor__nombre_tienda__icontains=q)
+            | Q(vendedor__ciudad__icontains=q)
+            | Q(vendedor__responsable__icontains=q)
+            | Q(vendedor__documento__icontains=q)
+            | Q(comprobante__icontains=q)
+            | Q(comprobante_comision__icontains=q)
+        )
+        if q.isdigit():
+            qs = qs | Pedido.objects.filter(pk=int(q))
+    tipo = request.GET.get("tipo") or ""
+    if tipo == "minorista":
+        qs = qs.exclude(vendedor__tipo__in=("mayorista", "importador"))
+    elif tipo:
+        qs = qs.filter(vendedor__tipo=tipo)
+    for campo, nombre in (
+        ("estado", "estado"),
+        ("estado_pago", "pago"),
+        ("estado_comision", "comision"),
+    ):
+        valor = request.GET.get(nombre) or ""
+        if valor:
+            qs = qs.filter(**{campo: valor})
+    ciudad = (request.GET.get("ciudad") or "").strip()
+    if ciudad:
+        qs = qs.filter(Q(cliente_ciudad__icontains=ciudad) | Q(vendedor__ciudad__icontains=ciudad))
+    desde = request.GET.get("desde") or ""
+    hasta = request.GET.get("hasta") or ""
+    if desde:
+        qs = qs.filter(creado__date__gte=desde)
+    if hasta:
+        qs = qs.filter(creado__date__lte=hasta)
+    minimo = _decimal_get(request.GET.get("monto_min"))
+    maximo = _decimal_get(request.GET.get("monto_max"))
+    if minimo is not None:
+        qs = qs.filter(monto_cop__gte=minimo)
+    if maximo is not None:
+        qs = qs.filter(monto_cop__lte=maximo)
+    if request.GET.get("con_comprobante") == "1":
+        qs = qs.exclude(comprobante_url="")
+
+    totales = qs.aggregate(
+        ventas=Count("id"),
+        unidades=Sum("cantidad"),
+        dinero=Sum("monto_cop"),
+        comision=Sum("comision_cop"),
+    )
+    deben = qs.filter(estado_comision__in=["pendiente", "vencida"]).aggregate(s=Sum("comision_cop"))["s"] or 0
+    reportado = qs.filter(estado_comision="reportada").aggregate(s=Sum("comision_cop"))["s"] or 0
+    pagado = qs.filter(estado_comision="pagada").aggregate(s=Sum("comision_cop"))["s"] or 0
+    pagina = Paginator(qs.distinct(), 40).get_page(request.GET.get("p"))
+    nequi, titular = nequi_plataforma()
+    return render(request, "pedidos/lista.html", {
+        "pedidos": pagina,
+        "pagina": pagina,
+        "totales": totales,
+        "deben": deben,
+        "reportado": reportado,
+        "pagado": pagado,
+        "tipos": TIPOS,
+        "estados": Pedido.ESTADOS,
+        "pagos": Pedido.ESTADOS_PAGO,
+        "comisiones": Pedido.ESTADOS_COMISION,
+        "nequi": nequi,
+        "titular": titular,
+        "wompi_conectado": wompi.checkout_listo(),
+        "q": q,
+    })
