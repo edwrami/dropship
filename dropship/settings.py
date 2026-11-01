@@ -107,6 +107,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# El contenedor que atiende la web no ve la carpeta generada por
+# collectstatic. WhiteNoise sirve era.css y era.js desde static/.
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "entrar_vendedor"
