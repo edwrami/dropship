@@ -101,7 +101,7 @@
         {% if p.fotos.all %}<img src="{{ p.fotos.all.0.url }}" alt="">{% elif p.imagen %}<img src="{{ p.imagen }}" alt="">{% endif %}
       </a>
       <div class="body">
-        <p class="kicker">{% if p.rubro %}{{ p.rubro.nombre }}{% elif p.categoria %}{{ p.categoria }}{% else %}ERA shop{% endif %}</p>
+        <p class="kicker">{{ p.categoria_es|default:"ERA shop" }}</p>
         <h3>{{ p.titulo|truncatechars:64 }}</h3>
         <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
         <p class="meta">

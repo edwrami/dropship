@@ -93,6 +93,13 @@ class Producto(models.Model):
         super().save(*args, **kwargs)
 
     @property
+    def categoria_es(self):
+        from productos.categorias_es import traducir_categoria
+        if self.rubro_id and getattr(self, "rubro", None) and self.rubro.nombre:
+            return self.rubro.nombre
+        return traducir_categoria(self.categoria)
+
+    @property
     def entrega_texto(self):
         if self.tiempo_entrega_min and self.tiempo_entrega_max:
             if self.tiempo_entrega_min == self.tiempo_entrega_max:

@@ -33,7 +33,7 @@
     <article class="product">
       <a class="media" href="{% url 'detalle_producto' p.pk %}">{% if p.fotos.all %}<img src="{{ p.fotos.all.0.url }}" alt="">{% elif p.imagen %}<img src="{{ p.imagen }}" alt="">{% endif %}</a>
       <div class="body">
-        <p class="kicker">{% if p.rubro %}{{ p.rubro.nombre }}{% else %}Producto{% endif %}</p>
+        <p class="kicker">{{ p.categoria_es|default:"Producto" }}</p>
         <h3>{{ p.titulo|truncatechars:64 }}</h3>
         <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
         <p class="meta">{% if p.entrega_texto %}Entrega {{ p.entrega_texto }}{% endif %}</p>

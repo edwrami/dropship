@@ -5,6 +5,7 @@ from urllib.parse import quote_plus, unquote, urljoin
 
 from django.conf import settings
 
+from productos.categorias_es import traducir_categoria
 from productos.models import Producto
 from productos.services.precios import evaluar_negocio
 
@@ -261,6 +262,9 @@ def _publicar(item, categoria=""):
     if not ok:
         return False
     margen = getattr(settings, "MARGEN_DEFAULT", 40)
+    nombre = traducir_categoria(categoria)
+    from vendedores.models import Categoria
+    rubro = Categoria.objects.filter(nombre__iexact=nombre).order_by("padre_id").first() if nombre else None
     Producto.objects.create(
         origen=item.get("origen") or "aliexpress",
         id_externo=item["id_externo"],
@@ -269,7 +273,8 @@ def _publicar(item, categoria=""):
         titulo=item["titulo"],
         descripcion=item.get("descripcion") or "",
         imagen=item.get("imagen") or "",
-        categoria=categoria,
+        categoria=nombre or categoria,
+        rubro=rubro,
         precio_costo=item["precio_costo"],
         moneda=item.get("moneda") or "USD",
         peso_libras=peso,

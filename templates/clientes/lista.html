@@ -14,7 +14,7 @@
       <article class="mayor-item">
         <div class="photo">{% include "productos/_slider.html" with producto=p %}</div>
         <div>
-          <p class="kicker">{% if p.rubro %}{{ p.rubro.nombre }}{% else %}{{ p.categoria }}{% endif %}</p>
+          <p class="kicker">{{ p.categoria_es|default:"Producto" }}</p>
           <h3>{{ p.titulo }}</h3>
           <p class="price">Al por mayor ${{ p.precio_mayor_cop|floatformat:0|intcomma }} COP</p>
           <p class="meta">Mostrador ${{ p.precio_final_cop|floatformat:0|intcomma }} · mínimo {{ p.cantidad_minima }}{% if p.unidad_empaque %} · {{ p.unidad_empaque }}{% endif %}</p>

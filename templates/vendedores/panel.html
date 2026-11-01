@@ -60,7 +60,7 @@
     {% for p in productos %}
       <tr>
         <td>{{ p.titulo|truncatechars:50 }}{% if not p.activo %} · oculto{% endif %}</td>
-        <td>{{ p.categoria }}</td>
+        <td>{{ p.categoria_es }}</td>
         <td>{{ p.ciudad_despacho }}</td>
         <td>{{ p.entrega_texto }}</td>
         <td>${{ p.precio_final_cop }}</td>

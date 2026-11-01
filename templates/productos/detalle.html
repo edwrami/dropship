@@ -16,7 +16,7 @@
     {% include "productos/_slider.html" %}
   </div>
   <div>
-    <p class="kicker">{% if producto.rubro %}{{ producto.rubro.padre.nombre }} · {{ producto.rubro.nombre }}{% elif producto.categoria %}{{ producto.categoria }}{% else %}ERA shop{% endif %}</p>
+    <p class="kicker">{% if producto.rubro.padre %}{{ producto.rubro.padre.nombre }} · {% endif %}{{ producto.categoria_es|default:"ERA shop" }}</p>
     <h2>{{ producto.titulo }}</h2>
     <p class="price">Mostrador ${{ producto.precio_final_cop|floatformat:0|intcomma }} COP</p>
     {% if ve_mayor %}
