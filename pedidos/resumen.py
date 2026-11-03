@@ -21,6 +21,15 @@ def pdf_pedido(pedido):
         f"Pago: {pedido.get_estado_pago_display}",
         f"Estado: {pedido.get_estado_display}",
     ]
+    pago = getattr(pedido, "pago", None)
+    if pago:
+        lineas.append(f"Registro: {pago.get_estado_display} · {pago.metodo or 'sin medio'}")
+        if pago.destino_nequi:
+            lineas.append(f"Nequi destino: {pago.destino_nequi}")
+        if pago.comprobante:
+            lineas.append(f"Comprobante: {pago.comprobante}")
+        if pago.wompi_id:
+            lineas.append(f"Wompi: {pago.wompi_id}")
     if pedido.tracking:
         lineas.append(f"Guia: {pedido.tracking}")
     if pedido.vendedor_id:
