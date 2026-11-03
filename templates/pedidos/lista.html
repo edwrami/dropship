@@ -116,7 +116,15 @@
           {% if p.comprobante_comision %}<br><small>ID {{ p.comprobante_comision }}</small>{% endif %}
           {% if p.comprobante_url %}<br><a href="{{ p.comprobante_url }}" target="_blank" rel="noopener">Ver comprobante</a>{% endif %}
         </td>
-        <td>{{ p.get_estado_pago_display }}<br><small>{{ p.get_estado_display }}</small></td>
+        <td>
+          {{ p.get_estado_pago_display }}<br><small>{{ p.get_estado_display }}</small>
+          {% if p.pago %}
+            <br><small>{{ p.pago.metodo }}{% if p.pago.destino_nequi %} · Nequi {{ p.pago.destino_nequi }}{% endif %}</small>
+            {% if p.pago.comprobante %}<br><small>Transferencia {{ p.pago.comprobante }}</small>{% endif %}
+            {% if p.pago.wompi_id %}<br><small>Wompi {{ p.pago.wompi_id }}</small>{% endif %}
+            <br><small>{{ p.pago.actualizado|date:"d/m/Y H:i" }}</small>
+          {% endif %}
+        </td>
         <td>
           <a href="{% url 'conversacion_pedido' p.id %}">Conversación</a>
           {% if p.estado_comision == "reportada" or p.estado_comision == "pendiente" %}

@@ -147,6 +147,32 @@ class Reclamo(models.Model):
         return f"{self.get_tipo_display()} del pedido {self.pedido_id}"
 
 
+class Pago(models.Model):
+    ESTADOS = [
+        ("reportado", "Reportado"),
+        ("aprobado", "Aprobado"),
+        ("declinado", "Declinado"),
+        ("error", "Error"),
+    ]
+    pedido = models.OneToOneField(Pedido, related_name="pago", on_delete=models.CASCADE)
+    monto_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    metodo = models.CharField(max_length=40, blank=True)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default="reportado")
+    referencia = models.CharField(max_length=80, blank=True)
+    comprobante = models.CharField(max_length=120, blank=True)
+    destino_nequi = models.CharField(max_length=20, blank=True)
+    wompi_id = models.CharField(max_length=80, blank=True)
+    origen = models.CharField(max_length=20, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-creado"]
+
+    def __str__(self):
+        return f"Pago del pedido {self.pedido_id}"
+
+
 class CuentaPlataforma(models.Model):
     titular = models.CharField(max_length=120, blank=True, default="ERA shop")
     nequi = models.CharField(max_length=20, blank=True)

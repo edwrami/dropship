@@ -6,6 +6,9 @@
   <h2>{{ pedido.producto.titulo }}</h2>
   <p class="price">${{ pedido.monto_cop|floatformat:0|intcomma }} COP · {{ pedido.cantidad }} und.</p>
   <p class="meta">Pago: {{ pedido.get_estado_pago_display }} · Pedido: {{ pedido.get_estado_display }}{% if pedido.tracking %} · Guía {{ pedido.tracking }}{% endif %}</p>
+  {% if pedido.pago %}
+    <p class="note">Quedó registrado: ${{ pedido.pago.monto_cop|floatformat:0 }} por {{ pedido.pago.metodo }}{% if pedido.pago.destino_nequi %}, Nequi {{ pedido.pago.destino_nequi }}{% endif %}{% if pedido.pago.comprobante %}, transferencia {{ pedido.pago.comprobante }}{% endif %}. {{ pedido.pago.get_estado_display }}.</p>
+  {% endif %}
   {% if pedido.vendedor %}
     <p>Tienda: <strong>{{ pedido.vendedor.nombre_tienda }}</strong> · {{ pedido.vendedor.get_tipo_display }} · {{ pedido.vendedor.ciudad }}</p>
   {% endif %}

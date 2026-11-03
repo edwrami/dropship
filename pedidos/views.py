@@ -212,6 +212,8 @@ def _reportar_pago_directo(request, pedido):
     pedido.estado_pago = "reportado"
     pedido.notas = f"Pago directo {metodo}. Comprobante: {comp}"
     pedido.save()
+    from .services.pagos import registrar_pago
+    registrar_pago(pedido, "reportado", "cliente", metodo=metodo, comprobante=comp)
     activar_cobro_comision(pedido)
     return render(
         request,
@@ -294,6 +296,11 @@ def _aplicar_transaccion(pedido, tx):
         if pedido.estado == "pendiente":
             pedido.estado = "pagado"
         pedido.save()
+        from .services.pagos import registrar_pago
+        registrar_pago(
+            pedido, "aprobado", "wompi",
+            metodo=pedido.metodo_pago, wompi_id=pedido.wompi_id,
+        )
         activar_cobro_comision(pedido)
         if not ya_pagado:
             try:
@@ -305,9 +312,13 @@ def _aplicar_transaccion(pedido, tx):
     elif status in ("DECLINED", "VOIDED"):
         pedido.estado_pago = "declinado"
         pedido.save()
+        from .services.pagos import registrar_pago
+        registrar_pago(pedido, "declinado", "wompi", metodo=pedido.metodo_pago, wompi_id=pedido.wompi_id)
     elif status == "ERROR":
         pedido.estado_pago = "error"
         pedido.save()
+        from .services.pagos import registrar_pago
+        registrar_pago(pedido, "error", "wompi", metodo=pedido.metodo_pago, wompi_id=pedido.wompi_id)
     else:
         pedido.save()
 
@@ -436,7 +447,11 @@ def _marcar_estado(request, pedido, rol, accion):
     if accion == "pagado" and paso < 1:
         pedido.estado = "pagado"
         pedido.estado_pago = "aprobado"
-        pedido.save(update_fields=["estado", "estado_pago"])
+        if not pedido.metodo_pago:
+            pedido.metodo_pago = "nequi" if pedido.contacto_nequi else "confirmado"
+        pedido.save(update_fields=["estado", "estado_pago", "metodo_pago"])
+        from .services.pagos import registrar_pago
+        registrar_pago(pedido, "aprobado", "vendedor", metodo=pedido.metodo_pago)
         activar_cobro_comision(pedido)
         nota = "La tienda marcó el pedido como pagado."
     elif accion == "empacado" and paso == 1:
@@ -606,7 +621,7 @@ def _registro_ventas(request):
         cola = request.GET.urlencode()
         return redirect(request.path + (f"?{cola}" if cola else ""))
 
-    qs = Pedido.objects.select_related("producto", "vendedor", "cliente_tienda")
+    qs = Pedido.objects.select_related("producto", "vendedor", "cliente_tienda", "pago")
     q = (request.GET.get("q") or "").strip()
     if q:
         qs = qs.filter(

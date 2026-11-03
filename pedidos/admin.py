@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from vendedores.services import activar_cobro_comision
 
-from .models import Calificacion, CuentaPlataforma, MensajePedido, Pedido, Reclamo
+from .models import Calificacion, CuentaPlataforma, MensajePedido, Pago, Pedido, Reclamo
 
 
 @admin.register(Pedido)
@@ -32,6 +32,8 @@ class PedidoAdmin(admin.ModelAdmin):
             if pedido.estado == "pendiente":
                 pedido.estado = "pagado"
             pedido.save()
+            from .services.pagos import registrar_pago
+            registrar_pago(pedido, "aprobado", "plataforma", metodo=pedido.metodo_pago or "confirmado")
             activar_cobro_comision(pedido)
             try:
                 procesar_pedido(pedido.id)
@@ -75,6 +77,13 @@ class CalificacionAdmin(admin.ModelAdmin):
 class ReclamoAdmin(admin.ModelAdmin):
     list_display = ("pedido", "tipo", "estado", "fecha_limite", "creado")
     list_filter = ("tipo", "estado")
+
+
+@admin.register(Pago)
+class PagoAdmin(admin.ModelAdmin):
+    list_display = ("pedido", "monto_cop", "metodo", "estado", "destino_nequi", "comprobante", "actualizado")
+    list_filter = ("estado", "metodo", "origen")
+    search_fields = ("referencia", "comprobante", "destino_nequi", "wompi_id", "pedido__cliente_nombre")
 
 
 @admin.register(CuentaPlataforma)
