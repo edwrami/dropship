@@ -114,6 +114,23 @@ def cancelar_pedido_vendedor(pedido, vendedor, acepta_sancion):
         return "cerrado"
     if pedido.estado_comision == "pagada":
         return "ya_liquidada"
+    if pedido.estado_comision == "retenida":
+        from pedidos.models import Giro
+
+        giro = Giro.objects.filter(pedido=pedido).first()
+        if giro and giro.estado in ("enviado", "pagado"):
+            return "giro_en_curso"
+        if giro:
+            giro.estado = "rechazado"
+            giro.detalle = "El pedido se anuló antes de girar el 90%."
+            giro.save()
+        pedido.estado = "fallido"
+        pedido.estado_comision = "anulada"
+        nota = "Pedido anulado. El 90% del vendedor todavía no había salido."
+        pedido.notas = f"{pedido.notas}\n{nota}".strip() if pedido.notas else nota
+        pedido.save()
+        devolver_stock(pedido)
+        return "giro_cancelado"
     if pedido.estado_comision in ("pendiente", "reportada"):
         if not acepta_sancion:
             return "falta_aceptar"

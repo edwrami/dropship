@@ -30,6 +30,12 @@ def pdf_pedido(pedido):
             lineas.append(f"Comprobante: {pago.comprobante}")
         if pago.wompi_id:
             lineas.append(f"Wompi: {pago.wompi_id}")
+    giro = getattr(pedido, "giro", None)
+    if giro:
+        lineas.append(f"Comision ERA shop: ${giro.comision_cop}")
+        lineas.append(f"Para la tienda: ${giro.monto_cop} · {giro.get_estado_display()}")
+        if giro.destino_nequi:
+            lineas.append(f"Nequi de la tienda: {giro.destino_nequi}")
     if pedido.tracking:
         lineas.append(f"Guia: {pedido.tracking}")
     if pedido.vendedor_id:

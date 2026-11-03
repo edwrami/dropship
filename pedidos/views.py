@@ -18,7 +18,7 @@ from django.views.decorators.http import require_POST
 from productos.models import Producto
 from vendedores.forms import _nequi_valido
 from vendedores.opciones import TIPOS
-from vendedores.services import activar_cobro_comision, aplicar_comision
+from vendedores.services import aplicar_comision
 
 from .avisos import avisar_estado, avisar_mensaje, avisar_pedido_nuevo
 from .models import Calificacion, CuentaPlataforma, MensajePedido, Pedido, Reclamo
@@ -272,7 +272,8 @@ def _aplicar_transaccion(pedido, tx):
             pedido, "aprobado", "wompi",
             metodo=pedido.metodo_pago, wompi_id=pedido.wompi_id,
         )
-        activar_cobro_comision(pedido)
+        from .services.giros import repartir
+        repartir(pedido)
         if not ya_pagado:
             try:
                 from productos.tasks import procesar_pedido
@@ -351,12 +352,15 @@ def _nombre_autor(pedido, rol):
 
 def conversacion_pedido(request, pedido_id):
     pedido = get_object_or_404(
-        Pedido.objects.select_related("producto", "vendedor", "cliente_tienda"),
+        Pedido.objects.select_related("producto", "vendedor", "cliente_tienda", "giro"),
         pk=pedido_id,
     )
     rol = _rol_pedido(request, pedido)
     if rol is None:
         raise Http404("Pedido no disponible")
+    if getattr(pedido, "giro", None) and pedido.giro.estado == "enviado":
+        from .services.giros import actualizar
+        actualizar(pedido.giro)
     if request.method == "POST":
         accion = request.POST.get("accion") or "mensaje"
         if accion in ("pagado", "empacado", "enviado", "entregado"):
@@ -571,7 +575,22 @@ def _registro_ventas(request):
                 messages.error(request, "Pega al menos la llave pública de Wompi.")
             else:
                 cuenta.save()
-                messages.success(request, "Wompi guardado. El botón de tarjeta ya puede cobrar.")
+                messages.success(request, "Wompi guardado. El botón de pago ya puede cobrar.")
+        elif accion == "payouts":
+            cuenta, _ = CuentaPlataforma.objects.get_or_create(pk=1)
+            api_key = (request.POST.get("payouts_api_key") or "").strip()
+            user_id = (request.POST.get("payouts_user_id") or "").strip()
+            if api_key:
+                cuenta.payouts_api_key = api_key[:200]
+            if user_id:
+                cuenta.payouts_user_id = user_id[:80]
+            if not (api_key or user_id):
+                messages.error(request, "Pega la API Key y el ID de usuario de Pagos a terceros.")
+            else:
+                cuenta.save()
+                from .services.giros import reintentar_pendientes
+                reintentar_pendientes()
+                messages.success(request, "Pagos a terceros guardado. Los giros pendientes se vuelven a intentar.")
         else:
             pedido = get_object_or_404(Pedido, pk=request.POST.get("pedido") or 0)
             if accion == "confirmar" and pedido.estado_comision in ("pendiente", "reportada"):
@@ -593,7 +612,7 @@ def _registro_ventas(request):
         cola = request.GET.urlencode()
         return redirect(request.path + (f"?{cola}" if cola else ""))
 
-    qs = Pedido.objects.select_related("producto", "vendedor", "cliente_tienda", "pago")
+    qs = Pedido.objects.select_related("producto", "vendedor", "cliente_tienda", "pago", "giro")
     q = (request.GET.get("q") or "").strip()
     if q:
         qs = qs.filter(

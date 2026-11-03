@@ -120,7 +120,7 @@ def panel(request):
     vendedor.refresh_from_db()
     productos = vendedor.productos.all()
     conexiones = vendedor.clientes_conectados.select_related("cliente") if vendedor.es_proveedor else []
-    pedidos = vendedor.pedidos.select_related("producto").all()
+    pedidos = vendedor.pedidos.select_related("producto", "giro").all()
     deuda = pedidos.filter(estado_comision__in=["pendiente", "reportada"]).aggregate(
         s=Sum("comision_cop")
     )["s"] or 0
@@ -163,6 +163,8 @@ def datos(request):
                 setattr(vendedor, campo, data[campo].strip() if isinstance(data[campo], str) else data[campo])
             vendedor.save()
             vendedor.categorias.set(categorias)
+            from pedidos.services.giros import reintentar_pendientes
+            reintentar_pendientes(vendedor)
             messages.success(request, "Clasificación actualizada.")
             return redirect("panel_vendedor")
     return render(request, "vendedores/datos.html", {
@@ -342,6 +344,10 @@ def cancelar_pedido(request, pk):
         )
     elif resultado == "ya_liquidada":
         messages.error(request, "Esa comisión ya está liquidada. Si debes cancelar la venta, hazlo desde el administrador.")
+    elif resultado == "giro_en_curso":
+        messages.error(request, "El 90% ya salió hacia el Nequi de la tienda. Este pedido no se puede anular aquí.")
+    elif resultado == "giro_cancelado":
+        messages.success(request, f"Pedido #{pedido.id} anulado. El dinero del vendedor todavía no había salido.")
     return redirect("panel_vendedor")
 
 

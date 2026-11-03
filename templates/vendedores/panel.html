@@ -79,7 +79,7 @@
   </table>
 
   <h3>Pedidos</h3>
-  <p class="muted">El pedido es el canal con el cliente. Ahí ves la entrega y se escriben. La comisión se consigna al Nequi de ERA shop y el comprobante se anexa en Liquidar.</p>
+  <p class="muted">El pedido es el canal con el cliente. Cuando el cliente paga en la página, ERA shop se queda con el 10% y el 90% se gira al Nequi de esta tienda.</p>
   <table>
     <tr><th>#</th><th>Producto</th><th>Cliente</th><th>Pago</th><th>Venta</th><th>Comisión {{ comision_pct }}%</th><th>Estado comisión</th><th></th></tr>
     {% for p in pedidos %}
@@ -89,7 +89,7 @@
         <td>{{ p.cliente_nombre }}<br><small>{{ p.cliente_ciudad }} · {{ p.cantidad }} und.</small><br><a href="{% url 'conversacion_pedido' p.id %}">Abrir pedido</a></td>
         <td>{{ p.get_estado_pago_display }}</td>
         <td>${{ p.monto_cop }}</td>
-        <td>${{ p.comision_cop }}</td>
+        <td>${{ p.comision_cop }}{% if p.giro %}<br><small>Te llegan ${{ p.giro.monto_cop }} · {{ p.giro.get_estado_display }}</small>{% endif %}</td>
         <td>
           {{ p.get_estado_comision_display }}
           {% if p.fecha_limite_comision and p.estado_comision == "pendiente" %}

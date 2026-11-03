@@ -27,6 +27,7 @@ class Pedido(models.Model):
         ("pendiente", "Pendiente de liquidar"),
         ("reportada", "Comprobante enviado"),
         ("pagada", "Liquidada"),
+        ("retenida", "El 10% quedó en ERA shop"),
         ("vencida", "Vencida"),
         ("anulada", "Anulada"),
     ]
@@ -173,12 +174,40 @@ class Pago(models.Model):
         return f"Pago del pedido {self.pedido_id}"
 
 
+class Giro(models.Model):
+    ESTADOS = [
+        ("pendiente", "Pendiente de giro"),
+        ("sin_datos", "Faltan datos del vendedor"),
+        ("enviado", "Enviado a Wompi"),
+        ("pagado", "Llegó al Nequi del vendedor"),
+        ("rechazado", "Rechazado"),
+    ]
+    pedido = models.OneToOneField(Pedido, related_name="giro", on_delete=models.CASCADE)
+    monto_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    comision_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    destino_nequi = models.CharField(max_length=20, blank=True)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default="pendiente")
+    payout_id = models.CharField(max_length=80, blank=True)
+    detalle = models.CharField(max_length=300, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-creado"]
+
+    def __str__(self):
+        return f"Giro del pedido {self.pedido_id}"
+
+
 class CuentaPlataforma(models.Model):
     titular = models.CharField(max_length=120, blank=True, default="ERA shop")
     nequi = models.CharField(max_length=20, blank=True)
     wompi_publica = models.CharField(max_length=200, blank=True)
     wompi_integridad = models.CharField(max_length=200, blank=True)
     wompi_eventos = models.CharField(max_length=200, blank=True)
+    payouts_api_key = models.CharField(max_length=200, blank=True)
+    payouts_user_id = models.CharField(max_length=80, blank=True)
+    payouts_account_id = models.CharField(max_length=80, blank=True)
 
     class Meta:
         verbose_name = "cuenta de comisiones"

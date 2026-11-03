@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Calificacion, CuentaPlataforma, MensajePedido, Pago, Pedido, Reclamo
+from .models import Calificacion, CuentaPlataforma, Giro, MensajePedido, Pago, Pedido, Reclamo
 
 
 @admin.register(Pedido)
@@ -66,7 +66,14 @@ class PagoAdmin(admin.ModelAdmin):
     search_fields = ("referencia", "comprobante", "destino_nequi", "wompi_id", "pedido__cliente_nombre")
 
 
+@admin.register(Giro)
+class GiroAdmin(admin.ModelAdmin):
+    list_display = ("pedido", "monto_cop", "comision_cop", "destino_nequi", "estado", "actualizado")
+    list_filter = ("estado",)
+    search_fields = ("destino_nequi", "payout_id", "pedido__cliente_nombre")
+
+
 @admin.register(CuentaPlataforma)
 class CuentaPlataformaAdmin(admin.ModelAdmin):
     list_display = ("titular", "nequi", "wompi_publica")
-    exclude = ("wompi_integridad", "wompi_eventos")
+    exclude = ("wompi_integridad", "wompi_eventos", "payouts_api_key")

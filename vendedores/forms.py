@@ -35,7 +35,7 @@ class RegistroForm(forms.Form):
     nequi = forms.CharField(
         label="Nequi para recibir pagos",
         max_length=20,
-        help_text="Celular de 10 dígitos. El cliente paga aquí después de pedir. No se muestra en el catálogo.",
+        help_text="Celular de 10 dígitos. Aquí llega el 90% de cada venta. ERA shop se queda con el 10%. No se muestra en el catálogo.",
     )
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     ciudad = forms.CharField(label="Ciudad", max_length=100)
@@ -88,7 +88,11 @@ class RegistroForm(forms.Form):
 class DatosVendedorForm(forms.Form):
     telefono = forms.CharField(label="Teléfono", max_length=50)
     whatsapp = forms.CharField(label="WhatsApp", max_length=50)
-    nequi = forms.CharField(label="Nequi para recibir pagos", max_length=20)
+    nequi = forms.CharField(
+        label="Nequi para recibir el 90%",
+        max_length=20,
+        help_text="Celular de 10 dígitos. Ahí se gira lo que le corresponde a la tienda.",
+    )
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     ciudad = forms.CharField(label="Ciudad", max_length=100)
     departamento = forms.ChoiceField(label="Departamento", choices=DEPARTAMENTOS_CHOICES)

@@ -39,6 +39,14 @@
     <button class="btn" type="submit">Guardar Wompi</button>
   </form>
 
+  <form method="post" class="card" style="max-width:520px">{% csrf_token %}
+    <input type="hidden" name="accion" value="payouts">
+    <p>Para girar el 90% al Nequi del vendedor, activa Pagos a terceros en Wompi y pega aquí la API Key y el ID de usuario principal. El 10% se queda en ERA shop.</p>
+    <label>API Key de Pagos a terceros<input name="payouts_api_key" type="password" autocomplete="off"></label>
+    <label>ID de usuario principal<input name="payouts_user_id" autocomplete="off"></label>
+    <button class="btn" type="submit">Guardar giro a vendedores</button>
+  </form>
+
   <form class="filters-grid filters" method="get">
     <label>Buscar<input name="q" value="{{ request.GET.q }}" placeholder="Cliente, tienda, teléfono, producto"></label>
     <label>Ciudad<input name="ciudad" value="{{ request.GET.ciudad }}"></label>
@@ -116,6 +124,7 @@
           <br><small>{{ p.get_estado_comision_display }}</small>
           {% if p.comprobante_comision %}<br><small>ID {{ p.comprobante_comision }}</small>{% endif %}
           {% if p.comprobante_url %}<br><a href="{{ p.comprobante_url }}" target="_blank" rel="noopener">Ver comprobante</a>{% endif %}
+          {% if p.giro %}<br><small>Al vendedor ${{ p.giro.monto_cop|floatformat:0|intcomma }} · {{ p.giro.get_estado_display }}{% if p.giro.destino_nequi %} · {{ p.giro.destino_nequi }}{% endif %}</small>{% endif %}
         </td>
         <td>
           {{ p.get_estado_pago_display }}<br><small>{{ p.get_estado_display }}</small>
