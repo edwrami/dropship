@@ -345,7 +345,7 @@ def cancelar_pedido(request, pk):
     elif resultado == "ya_liquidada":
         messages.error(request, "Esa comisión ya está liquidada. Si debes cancelar la venta, hazlo desde el administrador.")
     elif resultado == "giro_en_curso":
-        messages.error(request, "El 90% ya salió hacia el Nequi de la tienda. Este pedido no se puede anular aquí.")
+        messages.error(request, "El restante ya salió hacia el Nequi de la tienda. Este pedido no se puede anular aquí.")
     elif resultado == "giro_cancelado":
         messages.success(request, f"Pedido #{pedido.id} anulado. El dinero del vendedor todavía no había salido.")
     return redirect("panel_vendedor")

@@ -1,8 +1,10 @@
-<div class="aviso" id="cuenta-descuento" data-pct="{{ comision_pct }}">
-  <p>De cada venta se descuenta el <strong>{{ comision_pct }}%</strong>. Ese porcentaje se queda en ERA shop.</p>
-  <p>Tú recibes el <strong>{{ queda_pct }}%</strong> en tu Nequi. El cliente paga en la página. ERA shop te consigna ese restante cuando el dinero ya está en Wompi. La tarifa de la pasarela no se descuenta otra vez de tu parte.</p>
+<div class="aviso" id="cuenta-descuento" data-pct="{{ comision_pct }}" data-wompi-pct="{{ wompi_pct }}" data-wompi-fijo="{{ wompi_fijo }}" data-wompi-iva="{{ wompi_iva }}">
+  <p>Del precio que paga el cliente se descuentan dos cosas, y las dos las asumes tú:</p>
+  <p>El <strong>{{ comision_pct }}%</strong> se queda en ERA shop.</p>
+  <p>Wompi cobra <strong>{{ wompi_pct }}%</strong> del valor más <strong>${{ wompi_fijo }}</strong>, y el IVA del <strong>{{ wompi_iva }}%</strong> solo sobre esa tarifa.</p>
+  <p>Puedes sumar esos cargos al precio o publicar el precio ya con todo incluido. El cliente paga un solo valor. A tu Nequi llega lo que queda.</p>
   <label>Lo que te cuesta el producto<input id="mi-costo" inputmode="numeric" placeholder="Ej. 50000"></label>
-  <p>Para no perder, el precio de venta debe ser al menos <strong id="precio-minimo">—</strong>.</p>
+  <p>Para no perder, con todo incluido, el precio debe ser al menos <strong id="precio-minimo">—</strong>.</p>
   <button class="btn sec" id="usar-precio" type="button">Usar ese precio en el producto</button>
   <p id="resultado-precio"></p>
 </div>
@@ -11,7 +13,9 @@
   var caja = document.getElementById("cuenta-descuento");
   if (!caja) return;
   var pct = Number(caja.dataset.pct) || 10;
-  var queda = (100 - pct) / 100;
+  var wompiPct = Number(caja.dataset.wompiPct) || 2.65;
+  var fijo = Number(caja.dataset.wompiFijo) || 700;
+  var iva = Number(caja.dataset.wompiIva) || 19;
   var costo = document.getElementById("mi-costo");
   var minimo = document.getElementById("precio-minimo");
   var resultado = document.getElementById("resultado-precio");
@@ -31,20 +35,32 @@
     var n = Number(t);
     return n > 0 ? Math.round(n) : 0;
   }
+  function cargos(precio) {
+    var comision = Math.round(precio * pct / 100);
+    var tarifa = Math.round((precio * wompiPct / 100 + fijo) * (1 + iva / 100));
+    var neto = precio - comision - tarifa;
+    return { comision: comision, tarifa: tarifa, neto: neto > 0 ? neto : 0 };
+  }
+  function minimoPara(base) {
+    var denominador = 1 - pct / 100 - (wompiPct / 100) * (1 + iva / 100);
+    var p = Math.ceil((base + fijo * (1 + iva / 100)) / denominador);
+    if (p < 1) p = 1;
+    var tope = p + 5000;
+    while (cargos(p).neto < base && p < tope) p += 1;
+    return p;
+  }
   function pintar() {
     var base = leer(costo) || leer(costoCampo);
-    var minimoValor = base ? Math.ceil(base / queda) : 0;
+    var minimoValor = base ? minimoPara(base) : 0;
     minimo.textContent = minimoValor ? dinero(minimoValor) : "—";
-    var precio = leer(precioCampo);
+    var precio = leer(precioCampo) || minimoValor;
     if (!precio) {
-      resultado.textContent = minimoValor
-        ? "A ese precio te quedan " + dinero(base) + " y ERA shop se queda con " + dinero(minimoValor - base) + "."
-        : "Escribe un costo, o el precio del producto, para ver cuánto te queda.";
+      resultado.textContent = "Escribe lo que te cuesta, o el precio del producto, para ver los descuentos.";
       return;
     }
-    var paraTi = Math.round(precio * queda);
-    var aviso = base && paraTi < base ? " Con este precio te queda menos de lo que te cuesta." : "";
-    resultado.textContent = "A " + dinero(precio) + " te quedan " + dinero(paraTi) + " y ERA shop se queda con " + dinero(precio - paraTi) + "." + aviso;
+    var cuenta = cargos(precio);
+    var aviso = base && cuenta.neto < base ? " Con este precio te queda menos de lo que te cuesta." : "";
+    resultado.textContent = "A " + dinero(precio) + ": ERA shop " + dinero(cuenta.comision) + ", Wompi " + dinero(cuenta.tarifa) + ", te quedan " + dinero(cuenta.neto) + "." + aviso;
   }
   costo.addEventListener("input", pintar);
   if (precioCampo) precioCampo.addEventListener("input", pintar);
@@ -53,7 +69,7 @@
   usar.addEventListener("click", function () {
     var base = leer(costo) || leer(costoCampo);
     if (!base || !precioCampo) return;
-    precioCampo.value = String(Math.ceil(base / queda));
+    precioCampo.value = String(minimoPara(base));
     precioCampo.dispatchEvent(new Event("input"));
     pintar();
   });

@@ -129,7 +129,7 @@ def _enviar(giro, vendedor):
     cuenta = _cuenta()
     if not _llaves(cuenta):
         giro.estado = "pendiente"
-        giro.detalle = "El 90% queda anotado. ERA shop lo consigna a mano al Nequi del vendedor."
+        giro.detalle = "El restante queda anotado, ya sin el 10% ni la tarifa de Wompi. ERA shop lo consigna a mano."
         giro.save()
         return
     banco = _banco_nequi(cuenta)
@@ -281,7 +281,8 @@ def _anotar(pedido, giro):
         autor="plataforma",
         nombre="ERA shop",
         texto=(
-            f"De esta venta, ${giro.comision_cop} queda para ERA shop y "
+            f"De esta venta, ${giro.comision_cop} queda para ERA shop, "
+            f"${pedido.tarifa_pasarela_cop} es la tarifa de Wompi y "
             f"${giro.monto_cop} es para la tienda"
             f"{f', Nequi {giro.destino_nequi}' if giro.destino_nequi else ''}. "
             f"{giro.get_estado_display()}. {giro.detalle}"

@@ -68,6 +68,7 @@ class Pedido(models.Model):
 
     comision_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     comision_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    tarifa_pasarela_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     neto_vendedor = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     estado_comision = models.CharField(
         max_length=20, choices=ESTADOS_COMISION, default="exenta", db_index=True,

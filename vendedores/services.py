@@ -12,20 +12,34 @@ from productos.models import Producto
 from .opciones import banda_precio
 
 
+def tarifa_wompi(monto):
+    """2,65% + $700, y el IVA del 19% solo sobre esa tarifa."""
+    monto = Decimal(str(monto or 0))
+    pct = Decimal(str(getattr(settings, "WOMPI_PCT", "2.65")))
+    fijo = Decimal(str(getattr(settings, "WOMPI_FIJO_COP", 700)))
+    iva = Decimal(str(getattr(settings, "WOMPI_IVA_PCT", 19)))
+    base = monto * pct / Decimal("100") + fijo
+    return (base * (Decimal("1") + iva / Decimal("100"))).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+
 def aplicar_comision(pedido):
-    """Calcula el 10% sobre el valor cobrado al cliente."""
+    """El vendedor asume el 10% de ERA shop y la tarifa de Wompi."""
     if not pedido.vendedor_id:
         pedido.comision_pct = 0
         pedido.comision_cop = 0
+        pedido.tarifa_pasarela_cop = 0
         pedido.neto_vendedor = pedido.monto_cop or 0
         pedido.estado_comision = "exenta"
         return
     pct = Decimal(str(settings.COMISION_PCT))
     monto = Decimal(str(pedido.monto_cop or 0))
     comision = (monto * pct / Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    tarifa = tarifa_wompi(monto)
     pedido.comision_pct = pct
     pedido.comision_cop = comision
-    pedido.neto_vendedor = monto - comision
+    pedido.tarifa_pasarela_cop = tarifa
+    neto = monto - comision - tarifa
+    pedido.neto_vendedor = neto if neto > 0 else 0
     if pedido.estado_comision in ("", "exenta"):
         pedido.estado_comision = "por_confirmar"
 
@@ -122,11 +136,11 @@ def cancelar_pedido_vendedor(pedido, vendedor, acepta_sancion):
             return "giro_en_curso"
         if giro:
             giro.estado = "rechazado"
-            giro.detalle = "El pedido se anuló antes de girar el 90%."
+            giro.detalle = "El pedido se anuló antes de consignar el restante."
             giro.save()
         pedido.estado = "fallido"
         pedido.estado_comision = "anulada"
-        nota = "Pedido anulado. El 90% del vendedor todavía no había salido."
+        nota = "Pedido anulado. El restante del vendedor todavía no había salido."
         pedido.notas = f"{pedido.notas}\n{nota}".strip() if pedido.notas else nota
         pedido.save()
         devolver_stock(pedido)

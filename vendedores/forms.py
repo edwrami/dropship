@@ -35,7 +35,7 @@ class RegistroForm(forms.Form):
     nequi = forms.CharField(
         label="Nequi para recibir pagos",
         max_length=20,
-        help_text="Celular de 10 dígitos. Ahí te consignan el 90% de cada venta. No se muestra en el catálogo.",
+        help_text="Celular de 10 dígitos. Ahí llega lo que queda después del 10% y de la tarifa de Wompi. No se muestra en el catálogo.",
     )
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     ciudad = forms.CharField(label="Ciudad", max_length=100)
@@ -47,7 +47,7 @@ class RegistroForm(forms.Form):
         help_text="Clasificación inicial. Cuando publiques productos, el programa la ajusta al precio promedio.",
     )
     acepta_terminos = forms.BooleanField(
-        label="Acepto que de cada venta ERA shop descuenta el 10% y yo recibo el 90% en mi Nequi",
+        label="Acepto que de cada venta se descuentan el 10% de ERA shop y la tarifa de Wompi, y que yo recibo el resto en mi Nequi",
     )
 
     def clean_email(self):
@@ -89,9 +89,9 @@ class DatosVendedorForm(forms.Form):
     telefono = forms.CharField(label="Teléfono", max_length=50)
     whatsapp = forms.CharField(label="WhatsApp", max_length=50)
     nequi = forms.CharField(
-        label="Nequi para recibir el 90%",
+        label="Nequi para recibir el restante",
         max_length=20,
-        help_text="Celular de 10 dígitos. Ahí se gira lo que le corresponde a la tienda.",
+        help_text="Celular de 10 dígitos. Ahí llega el precio menos el 10% y menos la tarifa de Wompi.",
     )
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     ciudad = forms.CharField(label="Ciudad", max_length=100)
@@ -137,7 +137,7 @@ class ProductoVendedorForm(forms.ModelForm):
             "talla": "Talla",
             "sku": "SKU o referencia",
             "stock": "Unidades disponibles",
-            "precio_final_cop": "Precio de mostrador (COP)",
+            "precio_final_cop": "Precio que paga el cliente (COP)",
             "precio_costo": "Tu costo (privado)",
             "precio_mayor_cop": "Precio al por mayor (COP)",
             "cantidad_minima": "Cantidad mínima al por mayor",
@@ -153,7 +153,8 @@ class ProductoVendedorForm(forms.ModelForm):
         }
         help_texts = {
             "descripcion": "Qué es, materiales, medidas, qué incluye y cómo se usa. Mínimo 80 caracteres.",
-            "precio_costo": "El cliente no ve este valor.",
+            "precio_final_cop": "Puede ir ya con el 10% y la tarifa de Wompi incluidos. El cliente paga este único valor.",
+            "precio_costo": "El cliente no ve este valor. Sirve para avisarte si el precio te deja pérdida.",
             "precio_mayor_cop": "Solo lo ven las tiendas conectadas contigo. El catálogo público sigue mostrando el precio de mostrador.",
             "unidad_empaque": "Por ejemplo: caja x 12, docena, bulto.",
         }

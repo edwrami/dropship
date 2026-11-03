@@ -18,6 +18,9 @@ def marketplace(request):
     return {
         "comision_pct": getattr(settings, "COMISION_PCT", 10),
         "queda_pct": 100 - int(getattr(settings, "COMISION_PCT", 10)),
+        "wompi_pct": getattr(settings, "WOMPI_PCT", "2.65"),
+        "wompi_fijo": getattr(settings, "WOMPI_FIJO_COP", 700),
+        "wompi_iva": getattr(settings, "WOMPI_IVA_PCT", 19),
         "dias_liquidacion": getattr(settings, "DIAS_LIQUIDACION", 5),
         "vendedor_actual": vendedor,
         "cliente_actual": cliente,
