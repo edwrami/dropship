@@ -47,6 +47,31 @@
     <button class="btn" type="submit">Guardar giro a vendedores</button>
   </form>
 
+  {% if por_pagar %}
+  <section class="card">
+    <h3>Págales el restante a mano</h3>
+    <p>El dinero del cliente entra a tu Wompi. Tú te quedas con el 10% y le consignas el 90% al Nequi del vendedor. Cuando lo hagas, regístralo aquí.</p>
+    {% for p in por_pagar %}
+      <div class="note" style="margin:12px 0">
+        <p><strong>Pedido #{{ p.id }}</strong> · {{ p.producto.titulo|truncatechars:48 }}</p>
+        <p>Venta ${{ p.monto_cop|floatformat:0|intcomma }} · te quedas ${{ p.comision_cop|floatformat:0|intcomma }} · le giras ${{ p.neto_vendedor|floatformat:0|intcomma }}</p>
+        <p>{{ p.vendedor.nombre_tienda }} · {{ p.vendedor.responsable }} · cédula {{ p.vendedor.documento }}</p>
+        {% if p.vendedor.nequi %}
+          <p>Nequi: <strong>{{ p.vendedor.nequi }}</strong></p>
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="accion" value="pagar_vendedor">
+            <input type="hidden" name="pedido" value="{{ p.id }}">
+            <label>Número de la transferencia<input name="comprobante" placeholder="El que muestra tu Nequi"></label>
+            <button class="btn" type="submit">Ya pagué este restante</button>
+          </form>
+        {% else %}
+          <p>Esta tienda no tiene Nequi. No le consignes hasta que lo escriba en sus datos.</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
   <form class="filters-grid filters" method="get">
     <label>Buscar<input name="q" value="{{ request.GET.q }}" placeholder="Cliente, tienda, teléfono, producto"></label>
     <label>Ciudad<input name="ciudad" value="{{ request.GET.ciudad }}"></label>

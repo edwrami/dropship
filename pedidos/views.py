@@ -591,6 +591,14 @@ def _registro_ventas(request):
                 from .services.giros import reintentar_pendientes
                 reintentar_pendientes()
                 messages.success(request, "Pagos a terceros guardado. Los giros pendientes se vuelven a intentar.")
+        elif accion == "pagar_vendedor":
+            pedido = get_object_or_404(Pedido, pk=request.POST.get("pedido") or 0)
+            from .services.giros import marcar_pago_manual
+            giro = marcar_pago_manual(pedido, (request.POST.get("comprobante") or "").strip()[:120])
+            if giro and giro.estado == "pagado":
+                messages.success(request, f"Quedó registrado el pago del restante del pedido #{pedido.id}.")
+            else:
+                messages.error(request, "Ese pedido todavía no tiene un pago confirmado para consignar.")
         else:
             pedido = get_object_or_404(Pedido, pk=request.POST.get("pedido") or 0)
             if accion == "confirmar" and pedido.estado_comision in ("pendiente", "reportada"):
@@ -674,6 +682,12 @@ def _registro_ventas(request):
     pagado = qs.filter(estado_comision="pagada").aggregate(s=Sum("comision_cop"))["s"] or 0
     pagina = Paginator(qs.distinct(), 40).get_page(request.GET.get("p"))
     nequi, titular = nequi_plataforma()
+    por_pagar = (
+        Pedido.objects.filter(estado_pago="aprobado", vendedor__isnull=False)
+        .filter(Q(giro__isnull=True) | Q(giro__estado__in=["pendiente", "sin_datos", "enviado", "rechazado"]))
+        .select_related("vendedor", "producto", "giro")
+        .order_by("-creado")[:40]
+    )
     return render(request, "pedidos/lista.html", {
         "pedidos": pagina,
         "pagina": pagina,
@@ -689,5 +703,6 @@ def _registro_ventas(request):
         "titular": titular,
         "wompi_conectado": wompi.checkout_listo(),
         "webhook_url": request.build_absolute_uri("/pedidos/wompi/evento/"),
+        "por_pagar": por_pagar,
         "q": q,
     })

@@ -67,6 +67,37 @@ def actualizar(giro):
     return giro
 
 
+def marcar_pago_manual(pedido, comprobante=""):
+    """El dueño ya consignó el 90% al Nequi del vendedor."""
+    if not pedido.vendedor_id or pedido.estado_pago != "aprobado":
+        return None
+    if pedido.estado_comision not in ("anulada", "vencida", "retenida", "pagada"):
+        pedido.estado_comision = "retenida"
+        pedido.comision_pagada_en = timezone.now()
+        pedido.fecha_limite_comision = None
+        pedido.save(update_fields=["estado_comision", "comision_pagada_en", "fecha_limite_comision"])
+    vendedor = pedido.vendedor
+    giro, _creado = Giro.objects.get_or_create(
+        pedido=pedido,
+        defaults={
+            "monto_cop": pedido.neto_vendedor or 0,
+            "comision_cop": pedido.comision_cop or 0,
+            "destino_nequi": (vendedor.nequi or "")[:20],
+        },
+    )
+    if giro.estado == "pagado":
+        return giro
+    giro.monto_cop = pedido.neto_vendedor or 0
+    giro.comision_cop = pedido.comision_cop or 0
+    giro.destino_nequi = (vendedor.nequi or "")[:20]
+    giro.estado = "pagado"
+    recibo = f" Comprobante {comprobante}." if comprobante else ""
+    giro.detalle = f"ERA shop consignó este restante a mano, al Nequi {giro.destino_nequi}.{recibo}"[:300]
+    giro.save()
+    _anotar(pedido, giro)
+    return giro
+
+
 def reintentar_pendientes(vendedor=None):
     qs = Giro.objects.select_related("pedido__vendedor__user").exclude(estado__in=["pagado", "rechazado"])
     if vendedor is not None:
@@ -98,7 +129,7 @@ def _enviar(giro, vendedor):
     cuenta = _cuenta()
     if not _llaves(cuenta):
         giro.estado = "pendiente"
-        giro.detalle = "Falta activar Pagos a terceros en Wompi. El 90% queda anotado."
+        giro.detalle = "El 90% queda anotado. ERA shop lo consigna a mano al Nequi del vendedor."
         giro.save()
         return
     banco = _banco_nequi(cuenta)

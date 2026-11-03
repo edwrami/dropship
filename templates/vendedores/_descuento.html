@@ -1,0 +1,62 @@
+<div class="aviso" id="cuenta-descuento" data-pct="{{ comision_pct }}">
+  <p>De cada venta se descuenta el <strong>{{ comision_pct }}%</strong>. Ese porcentaje se queda en ERA shop.</p>
+  <p>Tú recibes el <strong>{{ queda_pct }}%</strong> en tu Nequi. El cliente paga en la página. ERA shop te consigna ese restante cuando el dinero ya está en Wompi. La tarifa de la pasarela no se descuenta otra vez de tu parte.</p>
+  <label>Lo que te cuesta el producto<input id="mi-costo" inputmode="numeric" placeholder="Ej. 50000"></label>
+  <p>Para no perder, el precio de venta debe ser al menos <strong id="precio-minimo">—</strong>.</p>
+  <button class="btn sec" id="usar-precio" type="button">Usar ese precio en el producto</button>
+  <p id="resultado-precio"></p>
+</div>
+<script>
+(function () {
+  var caja = document.getElementById("cuenta-descuento");
+  if (!caja) return;
+  var pct = Number(caja.dataset.pct) || 10;
+  var queda = (100 - pct) / 100;
+  var costo = document.getElementById("mi-costo");
+  var minimo = document.getElementById("precio-minimo");
+  var resultado = document.getElementById("resultado-precio");
+  var usar = document.getElementById("usar-precio");
+  var precioCampo = document.getElementById("id_precio_final_cop");
+  var costoCampo = document.getElementById("id_precio_costo");
+  function dinero(n) {
+    return "$" + Math.round(n).toLocaleString("es-CO");
+  }
+  function leer(el) {
+    if (!el) return 0;
+    var t = String(el.value).trim().replace(/\s/g, "");
+    if (!t) return 0;
+    if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+    else if (/^\d+,\d{1,2}$/.test(t)) t = t.replace(",", ".");
+    else t = t.replace(/[^\d.]/g, "");
+    var n = Number(t);
+    return n > 0 ? Math.round(n) : 0;
+  }
+  function pintar() {
+    var base = leer(costo) || leer(costoCampo);
+    var minimoValor = base ? Math.ceil(base / queda) : 0;
+    minimo.textContent = minimoValor ? dinero(minimoValor) : "—";
+    var precio = leer(precioCampo);
+    if (!precio) {
+      resultado.textContent = minimoValor
+        ? "A ese precio te quedan " + dinero(base) + " y ERA shop se queda con " + dinero(minimoValor - base) + "."
+        : "Escribe un costo, o el precio del producto, para ver cuánto te queda.";
+      return;
+    }
+    var paraTi = Math.round(precio * queda);
+    var aviso = base && paraTi < base ? " Con este precio te queda menos de lo que te cuesta." : "";
+    resultado.textContent = "A " + dinero(precio) + " te quedan " + dinero(paraTi) + " y ERA shop se queda con " + dinero(precio - paraTi) + "." + aviso;
+  }
+  costo.addEventListener("input", pintar);
+  if (precioCampo) precioCampo.addEventListener("input", pintar);
+  if (costoCampo) costoCampo.addEventListener("input", pintar);
+  if (!precioCampo) usar.hidden = true;
+  usar.addEventListener("click", function () {
+    var base = leer(costo) || leer(costoCampo);
+    if (!base || !precioCampo) return;
+    precioCampo.value = String(Math.ceil(base / queda));
+    precioCampo.dispatchEvent(new Event("input"));
+    pintar();
+  });
+  pintar();
+})();
+</script>

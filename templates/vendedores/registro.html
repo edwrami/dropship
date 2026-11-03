@@ -1,12 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
   <h2>Registro de vendedor</h2>
-  <div class="aviso">
-    <p>Cada venta deja una comisión del <strong>{{ comision_pct }}%</strong> para la página.</p>
-    <p>Cuando el cliente paga, tienes <strong>{{ dias_liquidacion }} días</strong> para liquidar ese porcentaje.</p>
-    <p>Si no lo pagas, la tienda y los productos salen de la página. Si cancelas un pedido después de que el cliente pagó, para no liquidar la comisión, la sanción es la misma.</p>
-    <p>El cliente ve tu ciudad y el nombre de la tienda. Las dudas y la entrega se hablan dentro del pedido. La comisión del {{ comision_pct }}% se consigna al Nequi de ERA shop y el comprobante se anexa en la página.</p>
-  </div>
+  {% include "vendedores/_descuento.html" %}
+  <p class="muted">El cliente ve tu ciudad y el nombre de la tienda. El teléfono y el Nequi no salen en el catálogo. Las dudas y la entrega se hablan dentro del pedido.</p>
   <form method="post">{% csrf_token %}
     {{ form.as_p }}
     {% include "vendedores/_categorias.html" %}

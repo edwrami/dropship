@@ -17,6 +17,7 @@ def marketplace(request):
             cliente = None
     return {
         "comision_pct": getattr(settings, "COMISION_PCT", 10),
+        "queda_pct": 100 - int(getattr(settings, "COMISION_PCT", 10)),
         "dias_liquidacion": getattr(settings, "DIAS_LIQUIDACION", 5),
         "vendedor_actual": vendedor,
         "cliente_actual": cliente,

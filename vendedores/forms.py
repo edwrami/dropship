@@ -35,7 +35,7 @@ class RegistroForm(forms.Form):
     nequi = forms.CharField(
         label="Nequi para recibir pagos",
         max_length=20,
-        help_text="Celular de 10 dígitos. Aquí llega el 90% de cada venta. ERA shop se queda con el 10%. No se muestra en el catálogo.",
+        help_text="Celular de 10 dígitos. Ahí te consignan el 90% de cada venta. No se muestra en el catálogo.",
     )
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     ciudad = forms.CharField(label="Ciudad", max_length=100)
@@ -47,7 +47,7 @@ class RegistroForm(forms.Form):
         help_text="Clasificación inicial. Cuando publiques productos, el programa la ajusta al precio promedio.",
     )
     acepta_terminos = forms.BooleanField(
-        label="Acepto la comisión del 10% y que, si no la liquido, mi tienda sale de la página",
+        label="Acepto que de cada venta ERA shop descuenta el 10% y yo recibo el 90% en mi Nequi",
     )
 
     def clean_email(self):
