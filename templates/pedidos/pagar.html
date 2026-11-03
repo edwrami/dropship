@@ -5,57 +5,30 @@
 <p class="eyebrow">Pedido #{{ pedido.id }}</p>
 <h2>{{ pedido.producto.titulo }}</h2>
 <p class="price">${{ pedido.monto_cop|floatformat:0|intcomma }} COP{% if pedido.cantidad %} · {{ pedido.cantidad }} und.{% endif %}</p>
-<p>Referencia <strong>{{ pedido.referencia_pago }}</strong>. Escríbela en el mensaje del pago.</p>
+<p>Referencia <strong>{{ pedido.referencia_pago }}</strong>.</p>
 <p><a class="btn sec" href="{% url 'conversacion_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Hablar en el pedido</a></p>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
-<div class="pay-grid">
-  <section class="pay-nequi">
-    <p class="eyebrow" style="color:#ffb3d8">Nequi</p>
-    <h3>Pagar al anunciante</h3>
-    {% if contacto_visible or not pedido.vendedor_id %}
-      {% if nequi_numero %}
-        <p>El dinero entra al Nequi de <strong>{{ nequi_nombre }}</strong>.</p>
-        <p class="num">{{ nequi_numero }}</p>
-        <p>Valor exacto: ${{ pedido.monto_cop|floatformat:0|intcomma }} · referencia {{ pedido.referencia_pago }}</p>
-        <button type="button" class="btn nequi" data-abrir-nequi="{{ nequi_numero }}">Abrir Nequi y copiar el número</button>
-      {% else %}
-        <p>Este anunciante todavía no publicó su Nequi. Puede pagarse con tarjeta si está activa.</p>
-      {% endif %}
-    {% else %}
-      <p>El Nequi del anunciante solo se muestra en el navegador donde hiciste el pedido.</p>
-    {% endif %}
-  </section>
-
-  <section class="pay-card">
-    <p class="eyebrow">Tarjeta</p>
-    <h3>Débito o crédito</h3>
-    {% if tarjeta_lista %}
-      <p>El pago con tarjeta entra por la pasarela de ERA shop y queda amarrado a este pedido.</p>
-      <form method="get" action="{{ wompi.checkout_url }}">
-        <input type="hidden" name="public-key" value="{{ wompi.public_key }}">
-        <input type="hidden" name="currency" value="{{ wompi.currency }}">
-        <input type="hidden" name="amount-in-cents" value="{{ wompi.amount_in_cents }}">
-        <input type="hidden" name="reference" value="{{ wompi.reference }}">
-        <input type="hidden" name="signature:integrity" value="{{ wompi.signature }}">
-        <input type="hidden" name="redirect-url" value="{{ wompi.redirect_url }}">
-        {% if wompi.customer_email %}<input type="hidden" name="customer-data:email" value="{{ wompi.customer_email }}">{% endif %}
-        <button class="btn ink" type="submit">Pagar con débito o crédito</button>
-      </form>
-    {% else %}
-      <p>La pasarela de tarjeta todavía no está conectada. Cuando ERA shop active Wompi, este botón cobra débito y crédito.</p>
-    {% endif %}
-  </section>
-</div>
-
-{% if contacto_visible or not pedido.vendedor_id %}
-  {% if nequi_numero %}
-    <h3>Ya pagué por Nequi</h3>
-    <form method="post" style="max-width:460px">{% csrf_token %}
-      <input type="hidden" name="metodo" value="nequi">
-      <label>ID de la transferencia<input name="comprobante" required placeholder="Número que muestra Nequi"></label>
-      <button class="btn" type="submit">Registrar este pago</button>
+<section class="card" style="max-width:520px">
+  <p class="eyebrow">Pago en la página</p>
+  <h3>Nequi, PSE o tarjeta</h3>
+  <p>El dinero entra por ERA shop. No se gira al Nequi del anunciante ni se pega un comprobante. Cuando el banco confirma, el pago queda registrado en este pedido.</p>
+  {% if tarjeta_lista %}
+    <form>
+      <script
+        src="https://checkout.wompi.co/widget.js"
+        data-render="button"
+        data-public-key="{{ wompi.public_key }}"
+        data-currency="{{ wompi.currency }}"
+        data-amount-in-cents="{{ wompi.amount_in_cents }}"
+        data-reference="{{ wompi.reference }}"
+        data-signature:integrity="{{ wompi.signature }}"
+        data-redirect-url="{{ wompi.redirect_url }}"
+        {% if wompi.customer_email %}data-customer-data:email="{{ wompi.customer_email }}"{% endif %}
+      ></script>
     </form>
+  {% else %}
+    <p>El cobro de la página todavía no está activo. ERA shop tiene que conectar la pasarela. Hasta entonces este pedido no se puede pagar.</p>
   {% endif %}
-{% endif %}
+</section>
 {% endblock %}

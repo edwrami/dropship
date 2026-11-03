@@ -3,10 +3,10 @@ from pedidos.models import MensajePedido, Pago
 
 def registrar_pago(pedido, estado, origen, metodo="", comprobante="", wompi_id=""):
     """Deja constancia del pago en la base y en la conversación del pedido."""
-    metodo = (metodo or pedido.metodo_pago or "nequi")[:40]
-    comprobante = (comprobante or pedido.comprobante or "")[:120]
+    metodo = (metodo or pedido.metodo_pago or "pagina")[:40]
+    comprobante = (comprobante or "")[:120]
     wompi_id = (wompi_id or pedido.wompi_id or "")[:80]
-    destino = (pedido.contacto_nequi or "")[:20]
+    destino = "" if origen == "wompi" else (pedido.contacto_nequi or "")[:20]
     pago, creado = Pago.objects.get_or_create(
         pedido=pedido,
         defaults={
@@ -31,7 +31,7 @@ def registrar_pago(pedido, estado, origen, metodo="", comprobante="", wompi_id="
     pago.estado = estado
     pago.referencia = pedido.referencia_pago or pago.referencia
     pago.comprobante = comprobante
-    pago.destino_nequi = destino or pago.destino_nequi
+    pago.destino_nequi = destino if origen == "wompi" else (destino or pago.destino_nequi)
     pago.wompi_id = wompi_id
     pago.origen = origen[:20]
     pago.save()

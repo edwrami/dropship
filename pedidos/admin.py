@@ -3,8 +3,6 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from vendedores.services import activar_cobro_comision
-
 from .models import Calificacion, CuentaPlataforma, MensajePedido, Pago, Pedido, Reclamo
 
 
@@ -21,25 +19,7 @@ class PedidoAdmin(admin.ModelAdmin):
         "comprobante", "comprobante_comision", "wompi_id", "tracking",
         "vendedor__nombre_tienda",
     )
-    actions = ("marcar_pagado", "confirmar_comision", "rechazar_comision")
-
-    @admin.action(description="Confirmar pago directo y comprar al proveedor")
-    def marcar_pagado(self, request, queryset):
-        from productos.tasks import procesar_pedido
-
-        for pedido in queryset.exclude(estado_pago="aprobado"):
-            pedido.estado_pago = "aprobado"
-            if pedido.estado == "pendiente":
-                pedido.estado = "pagado"
-            pedido.save()
-            from .services.pagos import registrar_pago
-            registrar_pago(pedido, "aprobado", "plataforma", metodo=pedido.metodo_pago or "confirmado")
-            activar_cobro_comision(pedido)
-            try:
-                procesar_pedido(pedido.id)
-            except Exception as e:
-                pedido.notas = f"Pagado. Error al comprar al proveedor: {e}"
-                pedido.save(update_fields=["notas"])
+    actions = ("confirmar_comision", "rechazar_comision")
 
     @admin.action(description="Confirmar que la comisión del 10% fue pagada")
     def confirmar_comision(self, request, queryset):

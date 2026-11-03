@@ -188,43 +188,13 @@ def pagar_pedido(request, pedido_id):
             "contacto_visible": contacto_visible(request, pedido),
         })
     if request.method == "POST":
-        return _reportar_pago_directo(request, pedido)
+        ctx = _ctx_pago(pedido, request)
+        ctx["contacto_visible"] = contacto_visible(request, pedido)
+        ctx["error"] = "El pago no se anota a mano ni se gira por fuera. Se cobra en esta página."
+        return render(request, "pedidos/pagar.html", ctx)
     ctx = _ctx_pago(pedido, request)
     ctx["contacto_visible"] = contacto_visible(request, pedido)
     return render(request, "pedidos/pagar.html", ctx)
-
-
-def _reportar_pago_directo(request, pedido):
-    metodo = (request.POST.get("metodo") or "nequi").strip()[:40]
-    comp = (request.POST.get("comprobante") or "").strip()[:120]
-    if not comp:
-        return render(
-            request,
-            "pedidos/pagar.html",
-            {
-                **_ctx_pago(pedido, request),
-                "error": "Pega el número o ID de la transferencia.",
-                "contacto_visible": contacto_visible(request, pedido),
-            },
-        )
-    pedido.metodo_pago = metodo
-    pedido.comprobante = comp
-    pedido.estado_pago = "reportado"
-    pedido.notas = f"Pago directo {metodo}. Comprobante: {comp}"
-    pedido.save()
-    from .services.pagos import registrar_pago
-    registrar_pago(pedido, "reportado", "cliente", metodo=metodo, comprobante=comp)
-    activar_cobro_comision(pedido)
-    return render(
-        request,
-        "pedidos/gracias.html",
-        {
-            "pedido": pedido,
-            "pagado": False,
-            "reportado": True,
-            "contacto_visible": contacto_visible(request, pedido),
-        },
-    )
 
 
 def _ctx_pago(pedido, request=None):
@@ -232,16 +202,8 @@ def _ctx_pago(pedido, request=None):
 
     from .services import wompi
 
-    if pedido.vendedor_id:
-        nequi_numero = pedido.contacto_nequi or ""
-        nequi_nombre = pedido.vendedor.nombre_tienda
-    else:
-        nequi_numero = getattr(settings, "PAGO_NEQUI", "") or ""
-        nequi_nombre = "ERA shop"
     ctx = {
         "pedido": pedido,
-        "nequi_numero": nequi_numero,
-        "nequi_nombre": nequi_nombre,
         "tarjeta_lista": wompi.checkout_listo(),
     }
     if request is not None and ctx["tarjeta_lista"]:
@@ -252,6 +214,15 @@ def _ctx_pago(pedido, request=None):
 
 def resultado_pago(request, pedido_id):
     pedido = get_object_or_404(Pedido, pk=pedido_id)
+    tx_id = (request.GET.get("id") or "").strip()[:80]
+    if tx_id:
+        publica = wompi.claves_wompi()[0]
+        tx = wompi.consultar_transaccion(tx_id, publica)
+        mismo_pedido = tx and (tx.get("reference") or "") == pedido.referencia_pago
+        mismo_valor = tx and int(tx.get("amount_in_cents") or 0) == wompi.monto_centavos(pedido)
+        if mismo_pedido and mismo_valor:
+            _aplicar_transaccion(pedido, tx)
+            pedido.refresh_from_db()
     return render(
         request,
         "pedidos/gracias.html",
@@ -319,6 +290,14 @@ def _aplicar_transaccion(pedido, tx):
         pedido.save()
         from .services.pagos import registrar_pago
         registrar_pago(pedido, "error", "wompi", metodo=pedido.metodo_pago, wompi_id=pedido.wompi_id)
+    elif pedido.estado_pago != "aprobado":
+        pedido.estado_pago = "reportado"
+        pedido.save()
+        from .services.pagos import registrar_pago
+        registrar_pago(
+            pedido, "reportado", "wompi",
+            metodo=pedido.metodo_pago, wompi_id=pedido.wompi_id,
+        )
     else:
         pedido.save()
 
@@ -444,16 +423,9 @@ def _marcar_estado(request, pedido, rol, accion):
         messages.error(request, "Ese pedido está cerrado.")
         return
     paso = _paso_pedido(pedido.estado)
-    if accion == "pagado" and paso < 1:
-        pedido.estado = "pagado"
-        pedido.estado_pago = "aprobado"
-        if not pedido.metodo_pago:
-            pedido.metodo_pago = "nequi" if pedido.contacto_nequi else "confirmado"
-        pedido.save(update_fields=["estado", "estado_pago", "metodo_pago"])
-        from .services.pagos import registrar_pago
-        registrar_pago(pedido, "aprobado", "vendedor", metodo=pedido.metodo_pago)
-        activar_cobro_comision(pedido)
-        nota = "La tienda marcó el pedido como pagado."
+    if accion == "pagado":
+        messages.error(request, "El pago lo confirma la página. No se marca a mano.")
+        return
     elif accion == "empacado" and paso == 1:
         pedido.estado = "empacado"
         pedido.save(update_fields=["estado"])
@@ -697,5 +669,6 @@ def _registro_ventas(request):
         "nequi": nequi,
         "titular": titular,
         "wompi_conectado": wompi.checkout_listo(),
+        "webhook_url": request.build_absolute_uri("/pedidos/wompi/evento/"),
         "q": q,
     })

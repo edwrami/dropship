@@ -10,10 +10,14 @@
       <p>Referencia: {{ pedido.referencia_pago }}{% if pedido.metodo_pago %} · {{ pedido.metodo_pago }}{% endif %}</p>
       <p>El pago quedó amarrado a este pedido.</p>
     {% elif reportado %}
-      <h2>Pedido #{{ pedido.id }} · pago reportado</h2>
+      <h2>Pedido #{{ pedido.id }} · pago en proceso</h2>
       <p>Monto ${{ pedido.monto_cop }} COP · ref. {{ pedido.referencia_pago }}</p>
-      <p>Comprobante: {{ pedido.comprobante }}</p>
-      <p>Cuando se confirme en Nequi/Bancolombia (mismo monto y {{ pedido.referencia_pago }}), el pedido pasa a pagado y se compra al proveedor.</p>
+      <p>El cobro ya salió de esta página. Cuando el banco lo apruebe, queda registrado como pagado.</p>
+    {% elif esperando %}
+      <h2>Pedido #{{ pedido.id }} · falta el pago</h2>
+      <p>Total: ${{ pedido.monto_cop }} COP</p>
+      <p>El pago se hace en la página, con Nequi, PSE o tarjeta.</p>
+      <a class="btn" href="{% url 'pagar_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Pagar en la página</a>
     {% else %}
       <h2>Pedido #{{ pedido.id }} creado</h2>
       <p>Producto: {{ pedido.producto.titulo }}</p>

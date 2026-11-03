@@ -19,9 +19,7 @@
     <div class="card">
       <p><strong>Estado del pedido</strong></p>
       {% if pedido.estado == "pendiente" %}
-        <form method="post">{% csrf_token %}
-          <button class="btn" name="accion" value="pagado" type="submit">Marcar pagado</button>
-        </form>
+        <p class="muted">El pago entra por la página. Cuando el banco lo confirme, el pedido pasa a pagado y se puede empacar.</p>
       {% elif pedido.estado == "pagado" or pedido.estado == "comprado" or pedido.estado == "en_casillero" %}
         <form method="post">{% csrf_token %}
           <button class="btn" name="accion" value="empacado" type="submit">Marcar empacado</button>

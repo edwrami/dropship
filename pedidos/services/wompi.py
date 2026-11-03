@@ -35,7 +35,8 @@ def firma_integridad(referencia, amount_in_cents, currency="COP"):
 
 
 def checkout_listo():
-    return bool(claves_wompi()[0])
+    publica, integridad, _eventos = claves_wompi()
+    return bool(publica and integridad)
 
 
 def contexto_widget(pedido, redirect_url):
@@ -53,10 +54,31 @@ def contexto_widget(pedido, redirect_url):
     }
 
 
+def consultar_transaccion(tx_id, public_key):
+    """Lee en Wompi una transacción creada desde esta página."""
+    if not tx_id or not public_key:
+        return None
+    import requests
+
+    base = "https://sandbox.wompi.co" if str(public_key).startswith("pub_test_") else "https://production.wompi.co"
+    try:
+        respuesta = requests.get(
+            f"{base}/v1/transactions/{tx_id}",
+            headers={"Authorization": f"Bearer {public_key}"},
+            timeout=12,
+        )
+    except requests.RequestException:
+        return None
+    if respuesta.status_code != 200:
+        return None
+    data = (respuesta.json() or {}).get("data") or {}
+    return data if isinstance(data, dict) else None
+
+
 def evento_valido(payload, checksum):
     secreto = claves_wompi()[2]
     if not secreto or not checksum:
-        return True
+        return False
     props = payload.get("signature", {}).get("properties") or []
     tx = (payload.get("data") or {}).get("transaction") or {}
     partes = []

@@ -23,7 +23,7 @@
 
   <form method="post" class="card" style="max-width:520px">{% csrf_token %}
     <input type="hidden" name="accion" value="nequi">
-    <p>Las comisiones, de mayoristas y de minoristas, se consignan a este Nequi.</p>
+    <p>Este Nequi es solo para la comisión que te consignan las tiendas. El pago del cliente no entra aquí: entra por la página.</p>
     <label>Titular<input name="titular" value="{{ titular }}"></label>
     <label>Tu Nequi<input name="nequi" value="{{ nequi }}" placeholder="10 dígitos, empieza por 3" required></label>
     <button class="btn" type="submit">Guardar Nequi</button>
@@ -31,7 +31,8 @@
 
   <form method="post" class="card" style="max-width:520px">{% csrf_token %}
     <input type="hidden" name="accion" value="wompi">
-    <p>Tarjeta débito y crédito. {% if wompi_conectado %}Wompi ya está conectado. Si pegas otra llave, reemplaza la anterior.{% else %}Pega las llaves de tu cuenta Wompi para activar el botón de tarjeta.{% endif %}</p>
+    <p>Aquí cobra el cliente: Nequi, PSE o tarjeta, dentro de la página. El dinero entra a tu cuenta Wompi y el pago queda registrado solo. {% if wompi_conectado %}Wompi ya está conectado. Si pegas otra llave, reemplaza la anterior.{% else %}Pega las tres llaves de tu cuenta Wompi.{% endif %}</p>
+    <p class="muted">En Wompi, la URL de eventos es {{ webhook_url }}</p>
     <label>Llave pública<input name="wompi_publica" autocomplete="off"></label>
     <label>Secreto de integridad<input name="wompi_integridad" type="password" autocomplete="off"></label>
     <label>Secreto de eventos<input name="wompi_eventos" type="password" autocomplete="off"></label>
