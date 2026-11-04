@@ -36,7 +36,7 @@ class RegistroForm(forms.Form):
     nequi = forms.CharField(
         label="Nequi para recibir pagos",
         max_length=20,
-        help_text="Celular de 10 dígitos. Ahí llega lo que queda después del 10% y de la tarifa de Wompi. No se muestra en el catálogo.",
+        help_text="Celular de 10 dígitos. Ahí llega lo que queda después del porcentaje de ERA shop y de la tarifa de Wompi. No se muestra en el catálogo.",
     )
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     ciudad = forms.CharField(label="Ciudad", max_length=100)
@@ -48,7 +48,7 @@ class RegistroForm(forms.Form):
         help_text="Clasificación inicial. Cuando publiques productos, el programa la ajusta al precio promedio.",
     )
     acepta_terminos = forms.BooleanField(
-        label="Acepto que de cada venta se descuentan el 10% de ERA shop y la tarifa de Wompi, y que yo recibo el resto en mi Nequi",
+        label="Acepto que de cada venta se descuentan el porcentaje vigente de ERA shop y la tarifa de Wompi, y que yo recibo el resto en mi Nequi",
     )
 
     def clean_email(self):
@@ -92,7 +92,7 @@ class DatosVendedorForm(forms.Form):
     nequi = forms.CharField(
         label="Nequi para recibir el restante",
         max_length=20,
-        help_text="Celular de 10 dígitos. Ahí llega el precio menos el 10% y menos la tarifa de Wompi.",
+        help_text="Celular de 10 dígitos. Ahí llega el precio menos el porcentaje de ERA shop y menos la tarifa de Wompi.",
     )
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     ciudad = forms.CharField(label="Ciudad", max_length=100)
@@ -157,8 +157,8 @@ class ProductoVendedorForm(forms.ModelForm):
         help_texts = {
             "descripcion": "Qué es, materiales, medidas, qué incluye y cómo se usa. Mínimo 80 caracteres.",
             "stock": "Déjalo vacío para publicar sin límite de unidades.",
-            "precio_final_cop": "Puede ir ya con el 10% y la tarifa de Wompi incluidos.",
-            "precio_promo_cop": "Opcional. Menor que el precio normal. El cliente paga este valor mientras la promoción esté vigente. El 10% y Wompi se calculan sobre él.",
+            "precio_final_cop": "Puede ir ya con el porcentaje de ERA shop y la tarifa de Wompi incluidos.",
+            "precio_promo_cop": "Opcional. Menor que el precio normal. El cliente paga este valor mientras la promoción esté vigente. El porcentaje de ERA shop y Wompi se calculan sobre él.",
             "promo_hasta": "Opcional. Si la dejas vacía, la promoción sigue hasta que la quites.",
             "precio_costo": "El cliente no ve este valor. Sirve para avisarte si el precio te deja pérdida.",
             "precio_mayor_cop": "Solo lo ven las tiendas conectadas contigo. El catálogo público sigue mostrando el precio de mostrador.",

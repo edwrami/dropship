@@ -129,7 +129,7 @@ def _enviar(giro, vendedor):
     cuenta = _cuenta()
     if not _llaves(cuenta):
         giro.estado = "pendiente"
-        giro.detalle = "El restante queda anotado, ya sin el 10% ni la tarifa de Wompi. ERA shop lo consigna a mano."
+        giro.detalle = "El restante queda anotado, ya sin la comisión de ERA shop ni la tarifa de Wompi. ERA shop lo consigna a mano."
         giro.save()
         return
     banco = _banco_nequi(cuenta)

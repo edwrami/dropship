@@ -21,7 +21,7 @@ class PedidoAdmin(admin.ModelAdmin):
     )
     actions = ("confirmar_comision", "rechazar_comision")
 
-    @admin.action(description="Confirmar que la comisión del 10% fue pagada")
+    @admin.action(description="Confirmar que la comisión fue pagada")
     def confirmar_comision(self, request, queryset):
         ahora = timezone.now()
         queryset.filter(estado_comision__in=["pendiente", "reportada"]).update(
