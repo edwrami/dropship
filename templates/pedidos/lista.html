@@ -56,26 +56,34 @@
     <button class="btn" type="submit">Guardar giro a vendedores</button>
   </form>
 
-  {% if por_pagar %}
+  {% if cobros %}
   <section class="card">
-    <h3>Págales el restante a mano</h3>
-    <p>El dinero del cliente entra a tu Wompi. Tú te quedas con el porcentaje de esa venta. La tarifa de Wompi ya salió y la asume el vendedor. Le consignas el restante. Cuando lo hagas, regístralo aquí.</p>
-    {% for p in por_pagar %}
+    <h3>Lo que le debes a cada vendedor</h3>
+    <p>Cuando el pago del cliente entra, queda separado por tienda. Le consignas su restante y lo marcas. Esa tienda queda en Pagado. Las otras del mismo pago siguen pendientes.</p>
+    {% for c in cobros %}
       <div class="note" style="margin:12px 0">
-        <p><strong>Pedido #{{ p.id }}</strong> · {% if p.lineas.all %}{{ p.lineas.all|length }} productos{% else %}{{ p.producto.titulo|truncatechars:48 }}{% endif %}</p>
-        <p>Venta ${{ p.monto_cop|floatformat:0|intcomma }} · te quedas ${{ p.comision_cop|floatformat:0|intcomma }}{% if p.tarifa_pasarela_cop %} · Wompi ${{ p.tarifa_pasarela_cop|floatformat:0|intcomma }}{% endif %} · le giras ${{ p.neto_vendedor|floatformat:0|intcomma }}</p>
-        <p>{{ p.vendedor.nombre_tienda }} · {{ p.vendedor.responsable }} · cédula {{ p.vendedor.documento }}</p>
-        {% if p.vendedor.nequi %}
-          <p>Nequi: <strong>{{ p.vendedor.nequi }}</strong></p>
-          <form method="post">{% csrf_token %}
-            <input type="hidden" name="accion" value="pagar_vendedor">
-            <input type="hidden" name="pedido" value="{{ p.id }}">
-            <label>Número de la transferencia<input name="comprobante" placeholder="El que muestra tu Nequi"></label>
-            <button class="btn" type="submit">Ya pagué este restante</button>
-          </form>
-        {% else %}
-          <p>Esta tienda no tiene Nequi. No le consignes hasta que lo escriba en sus datos.</p>
-        {% endif %}
+        <p><strong>Entró ${{ c.entrado|floatformat:0|intcomma }}</strong> de {{ c.cliente }} · {{ c.referencia }}</p>
+        <p>Te quedas ${{ c.comision|floatformat:0|intcomma }}{% if c.wompi %} · Wompi ${{ c.wompi|floatformat:0|intcomma }}{% endif %}</p>
+        {% for linea in c.lineas %}
+          <p>
+            <strong>{{ linea.pedido.vendedor.nombre_tienda }}</strong>
+            · pedido #{{ linea.pedido.id }}
+            · le corresponde ${{ linea.pedido.neto_vendedor|floatformat:0|intcomma }}
+            {% if linea.pedido.vendedor.nequi %} · Nequi {{ linea.pedido.vendedor.nequi }}{% endif %}
+            {% if linea.pagado %} · <strong>Pagado</strong>{% endif %}
+          </p>
+          {% if not linea.pagado %}
+            {% if not linea.pedido.vendedor.nequi %}
+              <p>Esta tienda no tiene Nequi. Consigna cuando lo tenga escrito y márcalo.</p>
+            {% endif %}
+            <form method="post">{% csrf_token %}
+              <input type="hidden" name="accion" value="pagar_vendedor">
+              <input type="hidden" name="pedido" value="{{ linea.pedido.id }}">
+              <label>Número de la transferencia<input name="comprobante" placeholder="El que muestra tu Nequi"></label>
+              <button class="btn" type="submit">Marcar pagado</button>
+            </form>
+          {% endif %}
+        {% endfor %}
       </div>
     {% endfor %}
   </section>
@@ -155,7 +163,7 @@
         </td>
         <td>{% if p.lineas.all %}{{ p.lineas.all|length }} productos{% if p.factura_iva %} · con IVA{% elif p.es_mayor %} · sin IVA{% endif %}{% else %}{{ p.producto.titulo|truncatechars:40 }}{% if p.variante %}<br><small>{{ p.variante }}</small>{% endif %}{% endif %}</td>
         <td>{{ p.cantidad }}</td>
-        <td>${{ p.monto_cop|floatformat:0|intcomma }}</td>
+        <td>${{ p.monto_cop|floatformat:0|intcomma }}{% if p.compra_id %}<br><small>Del pago {{ p.compra.referencia_pago }}</small>{% endif %}<br><small>Al vendedor ${{ p.neto_vendedor|floatformat:0|intcomma }}</small></td>
         <td>
           ${{ p.comision_cop|floatformat:0|intcomma }}
           <br><small>{{ p.get_estado_comision_display }}</small>

@@ -246,7 +246,7 @@ class Giro(models.Model):
         ("pendiente", "Pendiente de giro"),
         ("sin_datos", "Faltan datos del vendedor"),
         ("enviado", "Enviado a Wompi"),
-        ("pagado", "Llegó al Nequi del vendedor"),
+        ("pagado", "Pagado"),
         ("rechazado", "Rechazado"),
     ]
     pedido = models.OneToOneField(Pedido, related_name="giro", on_delete=models.CASCADE)

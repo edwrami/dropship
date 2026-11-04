@@ -783,7 +783,8 @@ def _registro_ventas(request):
             from .services.giros import marcar_pago_manual
             giro = marcar_pago_manual(pedido, (request.POST.get("comprobante") or "").strip()[:120])
             if giro and giro.estado == "pagado":
-                messages.success(request, f"Quedó registrado el pago del restante del pedido #{pedido.id}.")
+                tienda = pedido.vendedor.nombre_tienda if pedido.vendedor_id else "la tienda"
+                messages.success(request, f"Pagado. Quedó consignado el restante de {tienda}, pedido #{pedido.id}.")
             else:
                 messages.error(request, "Ese pedido todavía no tiene un pago confirmado para consignar.")
         else:
@@ -807,7 +808,9 @@ def _registro_ventas(request):
         cola = request.GET.urlencode()
         return redirect(request.path + (f"?{cola}" if cola else ""))
 
-    qs = Pedido.objects.select_related("producto", "vendedor", "cliente_tienda", "pago", "giro").prefetch_related("lineas")
+    qs = Pedido.objects.select_related(
+        "producto", "vendedor", "cliente_tienda", "pago", "giro", "compra",
+    ).prefetch_related("lineas")
     q = (request.GET.get("q") or "").strip()
     if q:
         qs = qs.filter(
@@ -874,11 +877,24 @@ def _registro_ventas(request):
     nequi, titular = nequi_plataforma()
     por_pagar = (
         Pedido.objects.filter(estado_pago="aprobado", vendedor__isnull=False)
-        .filter(Q(giro__isnull=True) | Q(giro__estado__in=["pendiente", "sin_datos", "enviado", "rechazado"]))
-        .select_related("vendedor", "producto", "giro")
-        .prefetch_related("lineas")
-        .order_by("-creado")[:40]
+        .filter(Q(giro__isnull=True) | ~Q(giro__estado="pagado"))
+        .values_list("compra_id", "id")
     )
+    compras_abiertas = []
+    sueltos = []
+    for compra_id, pedido_id in por_pagar:
+        if compra_id:
+            compras_abiertas.append(compra_id)
+        else:
+            sueltos.append(pedido_id)
+    cobros_qs = (
+        Pedido.objects.filter(estado_pago="aprobado", vendedor__isnull=False)
+        .filter(Q(compra_id__in=compras_abiertas[:40]) | Q(pk__in=sueltos[:40]))
+        .select_related("vendedor", "producto", "giro", "compra")
+        .prefetch_related("lineas")
+        .order_by("-creado")
+    )
+    cobros = _agrupar_cobros(cobros_qs)
     return render(request, "pedidos/lista.html", {
         "pedidos": pagina,
         "pagina": pagina,
@@ -894,6 +910,41 @@ def _registro_ventas(request):
         "titular": titular,
         "wompi_conectado": wompi.checkout_listo(),
         "webhook_url": request.build_absolute_uri("/pedidos/wompi/evento/"),
-        "por_pagar": por_pagar,
+        "cobros": cobros,
         "q": q,
     })
+
+
+def _agrupar_cobros(pedidos):
+    """Un pago del cliente, con lo que le corresponde a cada vendedor."""
+    from django.core.exceptions import ObjectDoesNotExist
+
+    grupos = []
+    indice = {}
+    for pedido in pedidos:
+        clave = f"c{pedido.compra_id}" if pedido.compra_id else f"p{pedido.id}"
+        if clave not in indice:
+            compra = pedido.compra if pedido.compra_id else None
+            grupo = {
+                "referencia": (compra.referencia_pago if compra else pedido.referencia_pago) or f"PED-{pedido.id}",
+                "cliente": pedido.cliente_nombre,
+                "entrado": Decimal("0"),
+                "comision": Decimal("0"),
+                "wompi": Decimal("0"),
+                "lineas": [],
+                "creado": pedido.creado,
+            }
+            indice[clave] = grupo
+            grupos.append(grupo)
+        grupo = indice[clave]
+        try:
+            pagado = pedido.giro.estado == "pagado"
+        except ObjectDoesNotExist:
+            pagado = False
+        grupo["lineas"].append({"pedido": pedido, "pagado": pagado})
+        grupo["entrado"] += Decimal(str(pedido.monto_cop or 0))
+        grupo["comision"] += Decimal(str(pedido.comision_cop or 0))
+        grupo["wompi"] += Decimal(str(pedido.tarifa_pasarela_cop or 0))
+    for grupo in grupos:
+        grupo["lineas"].sort(key=lambda linea: linea["pagado"])
+    return grupos
