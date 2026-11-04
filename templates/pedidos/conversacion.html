@@ -26,6 +26,7 @@
   {% include "vendedores/_contacto.html" %}
   <p class="note">Esta conversación es el canal del pedido. El teléfono del vendedor aparece cuando la transferencia queda aprobada.</p>
   <p><a class="btn sec" href="{% url 'resumen_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar resumen</a>
+    {% if pedido.estado_pago == "aprobado" %}<a class="btn" href="{% url 'recibo_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar comprobante</a>{% endif %}
     {% if pedido.es_mayor %}<a class="btn" href="{% url 'bodega_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar para bodega (Word)</a>{% endif %}
     {% if rol == "cliente" %}<a class="btn sec" href="{% url 'historial_comprador' %}">Ver mi historial</a>{% endif %}
   </p>

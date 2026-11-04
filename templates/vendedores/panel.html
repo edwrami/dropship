@@ -37,9 +37,12 @@
     <p><strong>Visitas de tu página:</strong> {{ vendedor.visitas }}</p>
     <p><strong>Calificación pública:</strong> {% if nota_publica %}{{ nota_publica|floatformat:1 }} de 5{% else %}Sin calificación todavía{% endif %}{% if total_notas %} · {{ total_notas }} comentarios{% endif %}</p>
     <p><strong>Por liquidar ahora:</strong> ${{ deuda }} COP</p>
-    <a class="btn" href="{% url 'datos_vendedor' %}">Editar clasificación</a>
+    <a class="btn" href="{% url 'datos_vendedor' %}">Editar la tienda</a>
     {% if vendedor.estado == "activo" %}
       <a class="btn" href="{% url 'nuevo_producto' %}">Publicar producto</a>
+      {% if vendedor.es_proveedor %}
+        <a class="btn sec" href="{% url 'cargar_lista' %}">Cargar lista</a>
+      {% endif %}
     {% endif %}
     <a class="btn sec" href="{% url 'liquidar_comision' %}">Liquidar comisión</a>
   </div>
@@ -59,6 +62,34 @@
         <tr><td colspan="3">Ninguna tienda se ha conectado todavía.</td></tr>
       {% endfor %}
     </table>
+  {% endif %}
+
+  <div class="pay-grid">
+    <section class="card">
+      <p>Unidades vendidas</p>
+      <strong>{{ unidades_vendidas }}</strong>
+      <p>Pedidos con el pago aprobado.</p>
+    </section>
+    <section class="card">
+      <p>Ya te pagaron</p>
+      <strong>${{ pagado_neto }}</strong>
+      <p>Restante que ERA shop ya marcó como pagado.</p>
+    </section>
+    <section class="card">
+      <p>Pendiente de giro</p>
+      <strong>${{ pendiente_neto }}</strong>
+      <p>Pagos aprobados que todavía no se te consignan.</p>
+    </section>
+  </div>
+  {% if bajos %}
+    <div class="note">
+      <p><strong>Inventario bajo</strong></p>
+      <ul>
+        {% for p in bajos %}
+          <li><a href="{% url 'editar_producto' p.pk %}">{{ p.titulo }}</a> · quedan {{ p.stock }}</li>
+        {% endfor %}
+      </ul>
+    </div>
   {% endif %}
 
   <h3>Productos</h3>

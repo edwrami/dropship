@@ -1,21 +1,26 @@
+import csv
 import uuid
+from decimal import Decimal, InvalidOperation
+from io import StringIO
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Avg, Count, Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from pedidos.models import Pedido
+from pedidos.models import LineaPedido, Pedido
 from productos.models import FotoProducto, Producto
 from productos.services.storage import borrar_foto, extension, subir_foto
 
 from .forms import DatosVendedorForm, ProductoVendedorForm, RegistroForm
-from .opciones import TIPOS
+from .opciones import DEPARTAMENTOS, TIPOS
 from .models import Categoria, Vendedor
 from .services import (
     aplicar_sanciones,
@@ -150,6 +155,16 @@ def panel(request):
         clientes.append(pedido)
     notas = vendedor.calificaciones.aggregate(promedio=Avg("estrellas"), total=Count("id"))
     nota_publica = vendedor.calificacion_manual if vendedor.calificacion_manual is not None else notas["promedio"]
+    aprobados = pedidos.filter(estado_pago="aprobado")
+    unidades_lineas = LineaPedido.objects.filter(
+        pedido__vendedor=vendedor, pedido__estado_pago="aprobado",
+    ).aggregate(s=Sum("cantidad"))["s"] or 0
+    unidades_simples = aprobados.filter(lineas__isnull=True).aggregate(s=Sum("cantidad"))["s"] or 0
+    pagado_neto = aprobados.filter(giro__estado="pagado").aggregate(s=Sum("neto_vendedor"))["s"] or 0
+    pendiente_neto = aprobados.filter(
+        Q(giro__isnull=True) | ~Q(giro__estado="pagado"),
+    ).aggregate(s=Sum("neto_vendedor"))["s"] or 0
+    bajos = productos.filter(activo=True, controla_stock=True, stock__lte=5)
     return render(request, "vendedores/panel.html", {
         "vendedor": vendedor,
         "productos": productos,
@@ -160,6 +175,10 @@ def panel(request):
         "nota_publica": nota_publica,
         "total_notas": notas["total"],
         "comentarios": vendedor.calificaciones.select_related("pedido").order_by("-creado")[:20],
+        "unidades_vendidas": unidades_lineas + unidades_simples,
+        "pagado_neto": pagado_neto,
+        "pendiente_neto": pendiente_neto,
+        "bajos": bajos,
     })
 
 
@@ -176,6 +195,8 @@ def datos(request):
         "ciudad": vendedor.ciudad,
         "departamento": vendedor.departamento,
         "tipo": vendedor.tipo,
+        "frase": vendedor.frase,
+        "horario": vendedor.horario,
     }
     form = DatosVendedorForm(request.POST or None, initial=inicial)
     seleccionadas = (
@@ -189,13 +210,33 @@ def datos(request):
             form.add_error(None, "Elige al menos una categoría.")
         else:
             data = form.cleaned_data
-            for campo in ("telefono", "whatsapp", "nequi", "direccion", "ciudad", "departamento", "tipo"):
+            for campo in ("telefono", "whatsapp", "nequi", "direccion", "ciudad", "departamento", "tipo", "frase", "horario"):
                 setattr(vendedor, campo, data[campo].strip() if isinstance(data[campo], str) else data[campo])
+            logo = request.FILES.get("logo")
+            if logo is not None:
+                try:
+                    ext, tipo_logo = extension(logo)
+                    logo.seek(0)
+                    ruta = f"logos/{vendedor.id}/{uuid.uuid4().hex[:12]}.{ext}"
+                    url_logo = subir_foto(logo.read(), ruta, tipo_logo)
+                    anterior = vendedor.logo_ruta
+                    vendedor.logo_url = url_logo
+                    vendedor.logo_ruta = ruta
+                    if anterior and anterior != ruta:
+                        borrar_foto(anterior)
+                except (ValueError, RuntimeError) as exc:
+                    messages.error(request, str(exc))
+                    return render(request, "vendedores/datos.html", {
+                        "form": form,
+                        "grupos": _grupos(),
+                        "seleccionadas": seleccionadas,
+                        "vendedor": vendedor,
+                    })
             vendedor.save()
             vendedor.categorias.set(categorias)
             from pedidos.services.giros import reintentar_pendientes
             reintentar_pendientes(vendedor)
-            messages.success(request, "Clasificación actualizada.")
+            messages.success(request, "Datos de la tienda actualizados.")
             return redirect("panel_vendedor")
     return render(request, "vendedores/datos.html", {
         "form": form,
@@ -423,6 +464,255 @@ def tienda_publica(request, slug):
     })
 
 
+def _digitos(valor):
+    return "".join(ch for ch in (valor or "") if ch.isdigit())
+
+
+def _perfil_de(user, nombre):
+    try:
+        return getattr(user, nombre)
+    except ObjectDoesNotExist:
+        return None
+
+
+def recuperar(request):
+    if request.user.is_authenticated and (
+        _vendedor(request.user) or _perfil_de(request.user, "comprador") or _perfil_de(request.user, "cliente_tienda")
+    ):
+        return redirect("panel_vendedor" if _vendedor(request.user) else "lista_productos")
+    error = ""
+    if request.method == "POST":
+        intentos = int(request.session.get("recuperar_intentos") or 0)
+        if intentos >= 8:
+            error = "Demasiados intentos. Cierra esta página y vuelve a intentar más tarde."
+        else:
+            request.session["recuperar_intentos"] = intentos + 1
+            email = (request.POST.get("email") or "").strip().lower()
+            documento = _digitos(request.POST.get("documento"))
+            clave = request.POST.get("password") or ""
+            clave2 = request.POST.get("password2") or ""
+            user = User.objects.filter(username=email).first()
+            coincide = False
+            if user is not None and len(documento) >= 5:
+                for nombre in ("vendedor", "comprador", "cliente_tienda"):
+                    perfil = _perfil_de(user, nombre)
+                    if perfil is not None and _digitos(perfil.documento) == documento:
+                        coincide = True
+                        break
+            if not coincide or len(clave) < 8 or clave != clave2:
+                error = "No coincide el correo con la cédula o el NIT de esa cuenta, o la clave nueva no cumple: mínimo 8 caracteres y las dos iguales."
+            else:
+                user.set_password(clave)
+                user.save(update_fields=["password"])
+                request.session["recuperar_intentos"] = 0
+                login(request, user)
+                messages.success(request, "Clave actualizada.")
+                if _vendedor(user):
+                    return redirect("panel_vendedor")
+                if _perfil_de(user, "comprador"):
+                    return redirect("datos_comprador")
+                return redirect("mis_proveedores")
+    return render(request, "vendedores/recuperar.html", {"error": error})
+
+
+def _numero_lista(valor):
+    texto = (valor or "").strip().replace("$", "").replace(" ", "")
+    if not texto:
+        return None
+    if "," in texto and "." in texto:
+        texto = texto.replace(".", "").replace(",", ".")
+    elif "," in texto:
+        texto = texto.replace(",", ".")
+    try:
+        return Decimal(texto)
+    except InvalidOperation:
+        return None
+
+
+def _departamento_lista(valor):
+    buscado = (valor or "").strip().casefold()
+    for nombre in DEPARTAMENTOS:
+        if nombre.casefold() == buscado:
+            return nombre
+    return ""
+
+
+def _filas_lista(archivo):
+    raw = archivo.read()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raw = raw[3:]
+    texto = raw.decode("utf-8")
+    muestra = texto[:2000]
+    delim = ";" if muestra.count(";") >= muestra.count(",") else ","
+    lector = csv.DictReader(StringIO(texto), delimiter=delim)
+    filas = []
+    for fila in lector:
+        limpia = {}
+        for clave, valor in (fila or {}).items():
+            if not clave:
+                continue
+            limpia[clave.strip().lower()] = (valor or "").strip()
+        if any(limpia.values()):
+            filas.append(limpia)
+    return filas
+
+
+def _producto_desde_fila(vendedor, fila, rubros):
+    nombre = (fila.get("nombre") or "")[:400]
+    descripcion = fila.get("descripcion") or ""
+    categoria = rubros.get((fila.get("categoria") or "").casefold())
+    precio = _numero_lista(fila.get("precio"))
+    mayor = _numero_lista(fila.get("precio_mayor"))
+    try:
+        minima = int((fila.get("cantidad_minima") or "").strip())
+    except ValueError:
+        minima = 0
+    ciudad = (fila.get("ciudad") or "")[:100]
+    departamento = _departamento_lista(fila.get("departamento"))
+    try:
+        entrega_min = int((fila.get("entrega_min") or "").strip())
+        entrega_max = int((fila.get("entrega_max") or "").strip())
+    except ValueError:
+        entrega_min = entrega_max = None
+    envio = (fila.get("envio") or "incluido").strip().lower()
+    if envio not in ("incluido", "aparte", "contraentrega"):
+        envio = ""
+    costo = _numero_lista(fila.get("costo_envio")) or Decimal("0")
+    stock_texto = (fila.get("stock") or "").strip()
+    errores = []
+    if len(nombre) < 3:
+        errores.append("falta el nombre")
+    if len(descripcion) < 80:
+        errores.append("la descripción necesita al menos 80 caracteres")
+    if categoria is None:
+        errores.append("la categoría no existe")
+    if precio is None or precio <= 0:
+        errores.append("falta el precio")
+    if mayor is None or mayor <= 0:
+        errores.append("falta el precio al por mayor")
+    if minima < 1:
+        errores.append("la cantidad mínima es al menos 1")
+    if not ciudad:
+        errores.append("falta la ciudad")
+    if not departamento:
+        errores.append("el departamento no coincide")
+    if entrega_min is None or entrega_max is None or entrega_max < entrega_min or entrega_min < 0:
+        errores.append("revisa los días de entrega")
+    if not envio:
+        errores.append("el envío debe ser incluido, aparte o contraentrega")
+    if envio == "aparte" and costo <= 0:
+        errores.append("falta el costo de envío")
+    stock = None
+    if stock_texto:
+        try:
+            stock = int(stock_texto)
+        except ValueError:
+            stock = -1
+        if stock < 0:
+            errores.append("el stock no es un número")
+    if errores:
+        return None, ", ".join(errores)
+    return {
+        "titulo": nombre,
+        "descripcion": descripcion,
+        "rubro": categoria,
+        "precio_final_cop": precio,
+        "precio_mayor_cop": mayor,
+        "cantidad_minima": minima,
+        "ciudad_despacho": ciudad,
+        "departamento_despacho": departamento,
+        "tiempo_entrega_min": entrega_min,
+        "tiempo_entrega_max": entrega_max,
+        "modo_envio": envio,
+        "costo_envio_cop": costo if envio == "aparte" else Decimal("0"),
+        "envio_gratis": envio == "incluido",
+        "stock": stock,
+        "marca": (fila.get("marca") or "")[:120],
+        "color": (fila.get("color") or "")[:80],
+        "talla": (fila.get("talla") or "")[:40],
+        "sku": (fila.get("sku") or "")[:80],
+        "unidad_empaque": (fila.get("unidad_empaque") or "")[:80],
+    }, ""
+
+
+@login_required(login_url="registro_vendedor")
+def cargar_lista(request):
+    vendedor = _vendedor(request.user)
+    if vendedor is None:
+        return redirect("/vendedores/registro/?tipo=mayorista&next=/vendedores/panel/")
+    if not vendedor.es_proveedor:
+        return render(request, "vendedores/cargar_lista.html", {"vendedor": vendedor, "puede": False})
+    if request.GET.get("ejemplo") == "1":
+        ejemplo = (
+            "nombre;descripcion;categoria;precio;precio_mayor;cantidad_minima;stock;ciudad;departamento;"
+            "entrega_min;entrega_max;envio;costo_envio;marca;unidad_empaque\n"
+            "Caja de vasos;Vaso de vidrio templado, caja por doce unidades, para restaurante. "
+            "Medidas y material van en este texto hasta completar la ficha.;Vasos;24000;18000;12;;Medellín;Antioquia;2;5;incluido;0;Genérica;caja x 12\n"
+        )
+        respuesta = HttpResponse(ejemplo, content_type="text/csv; charset=utf-8")
+        respuesta["Content-Disposition"] = 'attachment; filename="lista-era-shop.csv"'
+        return respuesta
+    errores = []
+    creados = 0
+    if request.method == "POST":
+        archivo = request.FILES.get("archivo")
+        if archivo is None:
+            errores.append("Elige el archivo CSV.")
+        elif archivo.size > 2 * 1024 * 1024:
+            errores.append("El archivo puede pesar hasta 2 MB.")
+        else:
+            try:
+                filas = _filas_lista(archivo)
+            except UnicodeDecodeError:
+                filas = []
+                errores.append("Guarda el archivo como CSV en UTF-8.")
+            if not errores and not filas:
+                errores.append("El archivo no tiene filas.")
+            elif not errores and len(filas) > 200:
+                errores.append("Carga hasta 200 productos por archivo.")
+            elif not errores:
+                rubros = {
+                    c.nombre.casefold(): c
+                    for c in Categoria.objects.filter(padre__isnull=False)
+                }
+                listos = []
+                for i, fila in enumerate(filas, start=2):
+                    datos, fallo = _producto_desde_fila(vendedor, fila, rubros)
+                    if fallo:
+                        errores.append(f"Fila {i}: {fallo}.")
+                    else:
+                        listos.append(datos)
+                for datos in listos:
+                    stock = datos.pop("stock")
+                    Producto.objects.create(
+                        vendedor=vendedor,
+                        origen="vendedor",
+                        id_externo=f"vend-{vendedor.id}-{uuid.uuid4().hex[:16]}",
+                        url_origen="",
+                        tienda=vendedor.nombre_tienda,
+                        moneda="COP",
+                        margen_pct=0,
+                        precio_costo=0,
+                        activo=True,
+                        controla_stock=stock is not None,
+                        stock=stock or 0,
+                        **datos,
+                    )
+                    creados += 1
+                if creados:
+                    reclasificar_vendedor(vendedor)
+                    messages.success(request, f"Quedaron publicados {creados} productos.")
+                if not errores and creados:
+                    return redirect("panel_vendedor")
+    return render(request, "vendedores/cargar_lista.html", {
+        "vendedor": vendedor,
+        "puede": True,
+        "errores": errores,
+        "creados": creados,
+        "categorias": Categoria.objects.filter(padre__isnull=False).select_related("padre").order_by("padre__orden", "orden"),
+    })
+
+
 def estado_tienda(request, slug):
     vendedor = get_object_or_404(Vendedor, slug=slug, estado="activo")
     return render(request, "compartir/estado.html", {
@@ -430,7 +720,7 @@ def estado_tienda(request, slug):
         "titulo": vendedor.nombre_tienda,
         "kicker": f"{vendedor.get_tipo_display()} · {vendedor.ciudad}",
         "precio": "",
-        "detalle": "Entra a la tienda y pide. La conversación queda dentro del pedido.",
+        "detalle": vendedor.frase or "Entra a la tienda y pide. La conversación queda dentro del pedido.",
         "enlace": reverse("tienda_publica", args=[vendedor.slug]),
-        "imagen": "",
+        "imagen": vendedor.logo_url,
     })

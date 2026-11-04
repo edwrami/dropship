@@ -26,6 +26,9 @@
         <a href="{% url 'proveedores_mayor' %}">Comprar al por mayor</a>
         <a href="{% url 'publicar_producto' %}">Publicar producto</a>
         <a href="{% url 'vender_mayor' %}">Vender al por mayor</a>
+        {% if user.is_authenticated %}
+          <a href="{% url 'avisos' %}">Avisos{% if avisos_sin_leer %} ({{ avisos_sin_leer }}){% endif %}</a>
+        {% endif %}
         {% if user.is_staff %}
           <a href="{% url 'lista_pedidos' %}">Ventas</a>
           <a href="{% url 'reputacion' %}">Visitas</a>
@@ -59,7 +62,14 @@
     </div>
   </main>
   <footer class="site-footer">
-    <div class="wrap">ERA shop · {{ visitas_sitio|intcomma }} visitas · el contacto del anunciante aparece cuando la transferencia queda aprobada</div>
+    <div class="wrap">
+      <p>ERA shop · {{ visitas_sitio|intcomma }} visitas · el contacto del anunciante aparece cuando la transferencia queda aprobada</p>
+      <p>
+        <a href="{% url 'pagina_legal' 'terminos' %}">Términos</a>
+        · <a href="{% url 'pagina_legal' 'devoluciones' %}">Devoluciones</a>
+        · <a href="{% url 'pagina_legal' 'datos' %}">Datos personales</a>
+      </p>
+    </div>
   </footer>
   <script src="{% static 'era.js' %}"></script>
 </body>

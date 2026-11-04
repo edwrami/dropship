@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Avisos · ERA shop{% endblock %}
+{% block content %}
+  <h2>Avisos</h2>
+  <p class="muted">Aquí llega el pago aprobado, la guía, la entrega, un pedido nuevo y un reclamo. Si el correo del sitio está conectado, el mismo aviso sale también al correo de la cuenta.</p>
+  {% for aviso in avisos %}
+    <article class="card">
+      <p class="kicker">{{ aviso.creado|date:"d/m/Y H:i" }}{% if not aviso.leido %} · nuevo{% endif %}</p>
+      <p><strong>{{ aviso.titulo }}</strong></p>
+      <p>{{ aviso.texto|linebreaksbr }}</p>
+      {% if aviso.url %}<p><a href="{{ aviso.url }}">Abrir</a></p>{% endif %}
+    </article>
+  {% empty %}
+    <p>Todavía no tienes avisos.</p>
+  {% endfor %}
+{% endblock %}

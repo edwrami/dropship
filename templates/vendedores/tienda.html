@@ -12,9 +12,11 @@
 {% block content %}
 <section class="hero">
   <div>
+    {% if tienda.logo_url %}<p><img class="logo-tienda" src="{{ tienda.logo_url }}" alt=""></p>{% endif %}
     <p class="eyebrow">{{ tienda.get_tipo_display }} · {{ tienda.ciudad }}</p>
     <h1>{{ tienda.nombre_tienda }}</h1>
-    <p class="lede">Elige un producto y pide. La conversación queda dentro del pedido.</p>
+    <p class="lede">{% if tienda.frase %}{{ tienda.frase }}{% else %}Elige un producto y pide. La conversación queda dentro del pedido.{% endif %}</p>
+    {% if tienda.horario %}<p class="meta">Despacho: {{ tienda.horario }}</p>{% endif %}
     <p class="meta">{{ tienda.visitas|intcomma }} visitas</p>
     <p class="meta">{% if nota_publica %}{{ nota_publica|floatformat:1 }} de 5{% else %}Sin calificación todavía{% endif %}{% if total_calificaciones %} · {{ total_calificaciones }} comentarios{% endif %}</p>
   </div>

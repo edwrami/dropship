@@ -114,6 +114,18 @@ class DatosVendedorForm(forms.Form):
         choices=TIPOS,
         help_text="Mayorista e importador publican lista al por mayor. Persona y tienda virtual no necesitan local.",
     )
+    frase = forms.CharField(
+        label="Qué vendes",
+        max_length=200,
+        required=False,
+        help_text="Una frase para tu página pública. Por ejemplo: ropa de hogar al detal, despacho el mismo día.",
+    )
+    horario = forms.CharField(
+        label="Horario de despacho",
+        max_length=120,
+        required=False,
+        help_text="Por ejemplo: lunes a viernes, 8 a. m. a 5 p. m. Persona y tienda virtual también lo pueden escribir.",
+    )
 
     def clean_telefono(self):
         return _telefono_valido(self.cleaned_data["telefono"])
@@ -312,6 +324,9 @@ class RegistroClienteForm(forms.Form):
     ciudad = forms.CharField(label="Ciudad", max_length=100)
     departamento = forms.ChoiceField(label="Departamento", choices=DEPARTAMENTOS_CHOICES)
     referencia = forms.CharField(label="Referencia o apartamento", max_length=200, required=False)
+    acepta = forms.BooleanField(
+        label="Acepto los términos, las devoluciones y el tratamiento de datos",
+    )
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -383,6 +398,9 @@ class RegistroCompradorForm(forms.Form):
     ciudad = forms.CharField(label="Ciudad", max_length=100)
     departamento = forms.ChoiceField(label="Departamento", choices=DEPARTAMENTOS_CHOICES)
     referencia = forms.CharField(label="Apartamento, torre o referencia", max_length=200, required=False)
+    acepta = forms.BooleanField(
+        label="Acepto los términos, las devoluciones y el tratamiento de datos",
+    )
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()

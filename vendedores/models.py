@@ -57,6 +57,10 @@ class Vendedor(models.Model):
         max_digits=3, decimal_places=1, null=True, blank=True,
         help_text="Si tiene valor, esta es la calificación que ve el público. Vacío usa el promedio de los comentarios.",
     )
+    frase = models.CharField(max_length=200, blank=True)
+    horario = models.CharField(max_length=120, blank=True)
+    logo_url = models.URLField(max_length=800, blank=True)
+    logo_ruta = models.CharField(max_length=300, blank=True)
     creado = models.DateTimeField(auto_now_add=True)
 
     class Meta:

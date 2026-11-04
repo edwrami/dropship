@@ -21,6 +21,7 @@
     {% if modo %}<input type="hidden" name="modo" value="{{ modo }}">{% endif %}
     {{ form.as_p }}
     {% include "vendedores/_categorias.html" %}
+    <p class="muted">Al crear la cuenta aceptas los <a href="{% url 'pagina_legal' 'terminos' %}">términos</a>, las <a href="{% url 'pagina_legal' 'devoluciones' %}">devoluciones</a> y el <a href="{% url 'pagina_legal' 'datos' %}">tratamiento de datos</a>.</p>
     <button class="btn" type="submit">{% if next == "/vendedores/producto/nuevo/" %}Guardar y publicar producto{% else %}Crear el registro{% endif %}</button>
   </form>
 {% endblock %}

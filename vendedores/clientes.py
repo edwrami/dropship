@@ -495,6 +495,8 @@ def _confirmar_carrito(request, cliente, proveedor, carrito):
         if producto.controla_stock:
             producto.stock -= cantidad
             producto.save(update_fields=["stock"])
+            from pedidos.avisos import avisar_stock_bajo
+            avisar_stock_bajo(producto)
         linea.delete()
         textos.append(f"{producto.titulo}: {cantidad} × ${peso(precio)}")
     factura = "Factura con IVA." if con_iva else "Factura sin IVA."
@@ -879,6 +881,8 @@ def _cerrar_carrito(comprador, carrito):
                 if producto.controla_stock:
                     producto.stock -= item["cantidad"]
                     producto.save(update_fields=["stock"])
+                    from pedidos.avisos import avisar_stock_bajo
+                    avisar_stock_bajo(producto)
         cargos_mostrador_grupo(pedidos)
         for pedido in pedidos:
             pedido.save()

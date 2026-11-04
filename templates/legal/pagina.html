@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} · ERA shop{% endblock %}
+{% block content %}
+  <h2>{{ titulo }}</h2>
+  {% for parrafo in parrafos %}
+    <p>{{ parrafo }}</p>
+  {% endfor %}
+  <p class="muted">
+    <a href="{% url 'pagina_legal' 'terminos' %}">Términos</a>
+    · <a href="{% url 'pagina_legal' 'devoluciones' %}">Devoluciones</a>
+    · <a href="{% url 'pagina_legal' 'datos' %}">Datos personales</a>
+  </p>
+{% endblock %}

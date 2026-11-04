@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
-from pedidos.models import CuentaPlataforma
+from pedidos.models import Aviso, CuentaPlataforma
 
 from .models import CarritoCompradorLinea, CarritoLinea
 
@@ -34,6 +34,9 @@ def marketplace(request):
     carrito_unidades = 0
     if comprador is not None:
         carrito_unidades = CarritoCompradorLinea.objects.filter(carrito__comprador=comprador).count()
+    avisos_sin_leer = 0
+    if user is not None and getattr(user, "is_authenticated", False):
+        avisos_sin_leer = Aviso.objects.filter(user=user, leido=False).count()
     return {
         "comision_pct": pct,
         "comision_detalle_pct": detalle,
@@ -49,5 +52,6 @@ def marketplace(request):
         "comprador_actual": comprador,
         "pedido_armado": pedido_armado,
         "carrito_unidades": carrito_unidades,
+        "avisos_sin_leer": avisos_sin_leer,
         "visitas_sitio": cuenta.visitas if cuenta is not None else 0,
     }

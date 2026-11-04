@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -20,8 +20,8 @@ from vendedores.forms import _nequi_valido
 from vendedores.opciones import TIPOS
 from vendedores.services import aplicar_comision
 
-from .avisos import avisar_estado, avisar_mensaje, avisar_pedido_nuevo
-from .models import Calificacion, Compra, CuentaPlataforma, MensajePedido, Pedido, Reclamo
+from .avisos import avisar_estado, avisar_mensaje, avisar_pago, avisar_pedido_nuevo, avisar_stock_bajo
+from .models import Aviso, Calificacion, Compra, CuentaPlataforma, MensajePedido, Pedido, Reclamo
 from .resumen import pdf_pedido
 from .services import wompi
 
@@ -234,6 +234,7 @@ def crear_pedido(request, producto_id):
         if producto.controla_stock:
             producto.stock -= cantidad
             producto.save(update_fields=["stock"])
+            avisar_stock_bajo(producto)
 
     _marcar_contacto(request, pedido)
     avisar_pedido_nuevo(
@@ -357,6 +358,10 @@ def _aplicar_transaccion(pedido, tx):
         from .services.giros import repartir
         repartir(pedido)
         if not ya_pagado:
+            try:
+                avisar_pago(pedido)
+            except Exception:
+                pass
             try:
                 from productos.tasks import procesar_pedido
                 procesar_pedido(pedido.id)
@@ -490,6 +495,42 @@ def resumen_pedido(request, pedido_id):
     respuesta = HttpResponse(archivo, content_type="application/pdf")
     respuesta["Content-Disposition"] = f'attachment; filename="pedido-{pedido.id}.pdf"'
     return respuesta
+
+
+def recibo_pedido(request, pedido_id):
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("producto", "vendedor").prefetch_related("lineas"),
+        pk=pedido_id,
+    )
+    if pedido.estado_pago != "aprobado":
+        raise Http404("El comprobante sale cuando el pago queda aprobado")
+    clave = (request.GET.get("clave") or "").strip()
+    if _rol_pedido(request, pedido) is None and not (clave and clave == pedido.clave_contacto):
+        raise Http404("Pedido no disponible")
+    from .recibo import docx_recibo
+
+    archivo = docx_recibo(pedido)
+    respuesta = HttpResponse(
+        archivo,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    respuesta["Content-Disposition"] = f'attachment; filename="comprobante-{pedido.id}.docx"'
+    return respuesta
+
+
+def avisos(request):
+    if not request.user.is_authenticated:
+        from django.contrib.auth.views import redirect_to_login
+        return redirect_to_login(request.get_full_path(), login_url="/vendedores/entrar/")
+    qs = Aviso.objects.filter(user=request.user)
+    if request.method == "POST":
+        qs.filter(leido=False).update(leido=True)
+        return redirect("avisos")
+    lista = list(qs[:50])
+    pendientes = [aviso.pk for aviso in lista if not aviso.leido]
+    if pendientes:
+        Aviso.objects.filter(pk__in=pendientes).update(leido=True)
+    return render(request, "pedidos/avisos.html", {"avisos": lista})
 
 
 def bodega_pedido(request, pedido_id):
@@ -697,7 +738,8 @@ def _resolver_reclamo(request, pedido, rol):
         messages.error(request, "Elige si lo aceptas, lo rechazas o lo cierras.")
         return
     reclamo.estado = decision
-    reclamo.save(update_fields=["estado"])
+    reclamo.cerrado_en = timezone.now()
+    reclamo.save(update_fields=["estado", "cerrado_en"])
     nota = f"La tienda marcó el {reclamo.get_tipo_display().lower()} como {reclamo.get_estado_display().lower()}."
     MensajePedido.objects.create(pedido=pedido, autor="plataforma", nombre="ERA shop", texto=nota)
     cliente, _tienda = _enlaces_pedido(request, pedido)
@@ -717,6 +759,64 @@ def _decimal_get(valor):
         return Decimal(str(valor).replace(",", "").strip())
     except (InvalidOperation, ValueError, TypeError):
         return None
+
+
+def _reclamos_sin_respuesta():
+    respondio = MensajePedido.objects.filter(
+        pedido_id=OuterRef("pedido_id"),
+        autor="vendedor",
+        creado__gte=OuterRef("creado"),
+    )
+    return (
+        Reclamo.objects.filter(estado="abierto", fecha_limite__lt=timezone.now())
+        .annotate(respondio=Exists(respondio))
+        .filter(respondio=False)
+        .select_related("pedido", "pedido__vendedor", "pedido__producto")
+        .order_by("fecha_limite")[:40]
+    )
+
+
+def _cerrar_reclamo_plataforma(request):
+    reclamo = get_object_or_404(Reclamo, pk=request.POST.get("reclamo") or 0, estado="abierto")
+    if reclamo.fecha_limite > timezone.now():
+        messages.error(request, "Ese reclamo todavía está dentro del plazo de la tienda.")
+        return
+    if MensajePedido.objects.filter(
+        pedido_id=reclamo.pedido_id, autor="vendedor", creado__gte=reclamo.creado,
+    ).exists():
+        messages.error(request, "La tienda ya respondió en el pedido.")
+        return
+    decision = request.POST.get("decision") or ""
+    nota = (request.POST.get("nota") or "").strip()
+    if decision not in ("reponer", "devolver", "rechazar"):
+        messages.error(request, "Elige reponer, devolver el dinero o rechazar.")
+        return
+    if len(nota) < 10:
+        messages.error(request, "Escribe la decisión con al menos 10 caracteres. Queda en el pedido.")
+        return
+    reclamo.decision = decision
+    reclamo.nota_cierre = nota[:2000]
+    reclamo.estado = "rechazado" if decision == "rechazar" else "aceptado"
+    reclamo.cerrado_en = timezone.now()
+    reclamo.save(update_fields=["decision", "nota_cierre", "estado", "cerrado_en"])
+    texto = (
+        f"ERA shop cerró el {reclamo.get_tipo_display().lower()}: "
+        f"{reclamo.get_decision_display()}. {reclamo.nota_cierre}"
+    )
+    MensajePedido.objects.create(
+        pedido=reclamo.pedido, autor="plataforma", nombre="ERA shop", texto=texto,
+    )
+    cliente, tienda = _enlaces_pedido(request, reclamo.pedido)
+    avisar_estado(reclamo.pedido, texto, cliente)
+    if reclamo.pedido.vendedor_id:
+        from .avisos import dejar_aviso
+        dejar_aviso(
+            [reclamo.pedido.vendedor.user],
+            f"Reclamo cerrado · pedido #{reclamo.pedido_id}",
+            texto,
+            tienda,
+        )
+    messages.success(request, texto)
 
 
 def _registro_ventas(request):
@@ -778,6 +878,8 @@ def _registro_ventas(request):
                 from .services.giros import reintentar_pendientes
                 reintentar_pendientes()
                 messages.success(request, "Pagos a terceros guardado. Los giros pendientes se vuelven a intentar.")
+        elif accion == "cerrar_reclamo":
+            _cerrar_reclamo_plataforma(request)
         elif accion == "pagar_vendedor":
             pedido = get_object_or_404(Pedido, pk=request.POST.get("pedido") or 0)
             from .services.giros import marcar_pago_manual
@@ -911,6 +1013,7 @@ def _registro_ventas(request):
         "wompi_conectado": wompi.checkout_listo(),
         "webhook_url": request.build_absolute_uri("/pedidos/wompi/evento/"),
         "cobros": cobros,
+        "reclamos_vencidos": _reclamos_sin_respuesta(),
         "q": q,
     })
 

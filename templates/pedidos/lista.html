@@ -56,6 +56,28 @@
     <button class="btn" type="submit">Guardar giro a vendedores</button>
   </form>
 
+  {% if reclamos_vencidos %}
+  <section class="card">
+    <h3>Reclamos sin respuesta</h3>
+    <p>Pasó el plazo y la tienda no escribió en el pedido. Ciérralo: reponer, devolver el dinero o rechazar. Eso queda escrito en el pedido.</p>
+    {% for r in reclamos_vencidos %}
+      <div class="note" style="margin:12px 0">
+        <p><strong>{{ r.get_tipo_display }}</strong> · pedido #{{ r.pedido_id }} · {{ r.pedido.cliente_nombre }}{% if r.pedido.vendedor %} · {{ r.pedido.vendedor.nombre_tienda }}{% endif %}</p>
+        <p>{{ r.motivo }}</p>
+        <p>Plazo vencido el {{ r.fecha_limite|date:"d/m/Y" }}.</p>
+        <form method="post">{% csrf_token %}
+          <input type="hidden" name="accion" value="cerrar_reclamo">
+          <input type="hidden" name="reclamo" value="{{ r.id }}">
+          <label>Decisión que queda en el pedido<textarea name="nota" rows="2" required></textarea></label>
+          <button class="btn" name="decision" value="reponer" type="submit">Reponer</button>
+          <button class="btn sec" name="decision" value="devolver" type="submit">Devolver el dinero</button>
+          <button class="btn sec" name="decision" value="rechazar" type="submit">Rechazar</button>
+        </form>
+      </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
   {% if cobros %}
   <section class="card">
     <h3>Lo que le debes a cada vendedor</h3>

@@ -17,7 +17,7 @@
       <td>{{ p.get_estado_pago_display }}</td>
       <td>{{ p.get_estado_display }}</td>
       <td>{% if p.calificacion %}{{ p.calificacion.estrellas }} de 5{% else %}—{% endif %}</td>
-      <td><a href="{% url 'conversacion_pedido' p.id %}">Abrir</a>{% if p.es_mayor %} · <a href="{% url 'bodega_pedido' p.id %}">Word</a>{% endif %}</td>
+      <td><a href="{% url 'conversacion_pedido' p.id %}">Abrir</a>{% if p.estado_pago == "aprobado" %} · <a href="{% url 'recibo_pedido' p.id %}">Comprobante</a>{% endif %}{% if p.es_mayor %} · <a href="{% url 'bodega_pedido' p.id %}">Word</a>{% endif %}</td>
     </tr>
   {% empty %}
     <tr><td colspan="10">Todavía no hay pedidos en este historial.</td></tr>

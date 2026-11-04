@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Cargar lista · ERA shop{% endblock %}
+{% block content %}
+  <h2>Cargar lista al por mayor</h2>
+  {% if not puede %}
+    <p>{{ vendedor.nombre_tienda }} está como {{ vendedor.get_tipo_display }}. La carga del archivo es para mayorista e importador.</p>
+    <p><a class="btn" href="{% url 'datos_vendedor' %}">Cambiar a mayorista o importador</a></p>
+  {% else %}
+    <p class="muted">Un archivo CSV, hasta 200 filas. La categoría tiene que existir ya en ERA shop, escrita igual. El envío es incluido, aparte o contraentrega. Si el stock va vacío, el producto queda sin límite. Las fotos se agregan después, una por una, si las quieres.</p>
+    <p><a href="{% url 'cargar_lista' %}?ejemplo=1">Descargar un ejemplo</a></p>
+    <p class="muted">Escribe la categoría tal cual: {% for c in categorias %}{{ c.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}todavía no hay categorías{% endfor %}.</p>
+    {% if errores %}
+      <div class="error">
+        {% for error in errores %}<p>{{ error }}</p>{% endfor %}
+      </div>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data" style="max-width:520px">{% csrf_token %}
+      <label>Archivo CSV<input type="file" name="archivo" accept=".csv,text/csv" required></label>
+      <p><button class="btn" type="submit">Publicar la lista</button></p>
+    </form>
+  {% endif %}
+{% endblock %}

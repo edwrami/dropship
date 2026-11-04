@@ -6,6 +6,7 @@
   <form method="post" style="max-width:720px">{% csrf_token %}
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     {{ form.as_p }}
+    <p class="muted">Al crear la cuenta aceptas los <a href="{% url 'pagina_legal' 'terminos' %}">términos</a>, las <a href="{% url 'pagina_legal' 'devoluciones' %}">devoluciones</a> y el <a href="{% url 'pagina_legal' 'datos' %}">tratamiento de datos</a>.</p>
     <button class="btn" type="submit">Guardar y continuar</button>
   </form>
   <p class="muted">¿Ya te registraste? <a href="{% url 'entrar_comprador' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Entrar</a></p>

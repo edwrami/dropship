@@ -11,4 +11,5 @@
     <p><button class="btn" type="submit">Entrar</button></p>
   </form>
   <p class="muted">¿Aún no está registrado? <a href="{% url 'registro_cliente' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Registrar el establecimiento</a></p>
+  <p class="muted"><a href="{% url 'recuperar_clave' %}">Olvidé la clave</a></p>
 {% endblock %}

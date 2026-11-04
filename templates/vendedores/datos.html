@@ -2,8 +2,11 @@
 {% block content %}
   <h2>Clasificación de {{ vendedor.nombre_tienda }}</h2>
   <p class="muted">Ciudad, tipo y categorías quedan guardados para la búsqueda. El rango de precios lo calcula el programa con tus productos.</p>
-  <form method="post">{% csrf_token %}
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
     {{ form.as_p }}
+    <label>Logo<input type="file" name="logo" accept="image/jpeg,image/png,image/webp"></label>
+    {% if vendedor.logo_url %}<p><img class="logo-tienda" src="{{ vendedor.logo_url }}" alt=""></p>{% endif %}
+    <p class="muted">JPG, PNG o WEBP, hasta 5 MB. Se ve en la página pública de la tienda.</p>
     {% include "vendedores/_categorias.html" %}
     <button class="btn" type="submit">Guardar clasificación</button>
   </form>

@@ -12,4 +12,5 @@
     <button class="btn" type="submit">Entrar</button>
   </form>
   <p class="muted">¿Primera vez? <a href="{% url 'registro_comprador' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Regístrate con tus datos</a>.</p>
+  <p class="muted"><a href="{% url 'recuperar_clave' %}">Olvidé la clave</a></p>
 {% endblock %}

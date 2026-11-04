@@ -1,4 +1,5 @@
-﻿from django.db import models
+﻿from django.conf import settings
+from django.db import models
 
 from productos.models import Producto
 
@@ -201,11 +202,20 @@ class Reclamo(models.Model):
         ("rechazado", "Rechazado"),
         ("cerrado", "Cerrado"),
     ]
+    DECISIONES = [
+        ("", "Sin decisión"),
+        ("reponer", "Reponer el producto"),
+        ("devolver", "Devolver el dinero"),
+        ("rechazar", "Rechazar el reclamo"),
+    ]
     pedido = models.ForeignKey(Pedido, related_name="reclamos", on_delete=models.CASCADE)
     tipo = models.CharField(max_length=20, choices=TIPOS)
     motivo = models.TextField()
     estado = models.CharField(max_length=20, choices=ESTADOS, default="abierto")
+    decision = models.CharField(max_length=20, choices=DECISIONES, blank=True, default="")
+    nota_cierre = models.TextField(blank=True)
     fecha_limite = models.DateTimeField()
+    cerrado_en = models.DateTimeField(null=True, blank=True)
     creado = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -285,3 +295,20 @@ class CuentaPlataforma(models.Model):
 
     def __str__(self):
         return self.nequi or "Nequi de ERA shop"
+
+
+class Aviso(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="avisos", on_delete=models.CASCADE,
+    )
+    titulo = models.CharField(max_length=160)
+    texto = models.TextField()
+    url = models.CharField(max_length=300, blank=True)
+    leido = models.BooleanField(default=False, db_index=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creado", "-id"]
+
+    def __str__(self):
+        return self.titulo
