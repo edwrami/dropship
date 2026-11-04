@@ -5,7 +5,12 @@
   <div>
     <p class="eyebrow">Marketplace</p>
     <h1>ERA shop</h1>
-    <p class="lede">Encuentra la mercancía y pide en la página. La conversación con la tienda queda dentro del pedido. Si tienes tienda, entra a <a href="{% url 'proveedores_mayor' %}">mayoristas e importadores</a>.</p>
+    <p class="lede">Compra en el catálogo, compra al por mayor o publica. Persona, tienda física, tienda virtual, mayorista e importador entran por el enlace que les corresponde.</p>
+    <p>
+      <a class="btn" href="{% url 'publicar_producto' %}">Publicar producto</a>
+      <a class="btn sec" href="{% url 'vender_mayor' %}">Vender al por mayor</a>
+      <a class="btn sec" href="{% url 'proveedores_mayor' %}">Comprar al por mayor</a>
+    </p>
   </div>
   <aside class="hero-card">
     <p>Hoy en el catálogo</p>

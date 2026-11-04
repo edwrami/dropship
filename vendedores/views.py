@@ -15,6 +15,7 @@ from productos.models import FotoProducto, Producto
 from productos.services.storage import borrar_foto, extension, subir_foto
 
 from .forms import DatosVendedorForm, ProductoVendedorForm, RegistroForm
+from .opciones import TIPOS
 from .models import Categoria, Vendedor
 from .services import (
     aplicar_sanciones,
@@ -44,11 +45,23 @@ def _categorias_validas(ids):
     return list(Categoria.objects.filter(pk__in=ids, padre__isnull=False))
 
 
+def _destino_registro(request):
+    destino = (request.POST.get("next") or request.GET.get("next") or "").strip()
+    if destino in ("/vendedores/producto/nuevo/", "/vendedores/panel/"):
+        return destino
+    return "/vendedores/panel/"
+
+
 @transaction.atomic
 def registro(request):
     if _vendedor(request.user):
-        return redirect("panel_vendedor")
-    form = RegistroForm(request.POST or None)
+        return redirect(_destino_registro(request))
+    inicial = {}
+    if request.method == "GET":
+        tipo = (request.GET.get("tipo") or "").strip()
+        if tipo in dict(TIPOS):
+            inicial["tipo"] = tipo
+    form = RegistroForm(request.POST or None, initial=inicial)
     seleccionadas = _ids_categorias(request) if request.method == "POST" else []
     if request.method == "POST" and form.is_valid():
         categorias = _categorias_validas(seleccionadas)
@@ -78,12 +91,15 @@ def registro(request):
             )
             vendedor.categorias.set(categorias)
             login(request, user)
-            messages.success(request, "Tienda creada. Ya puedes publicar mercancía.")
-            return redirect("panel_vendedor")
+            messages.success(request, "Registro listo. Ahora completa el producto si vas a publicarlo.")
+            return redirect(_destino_registro(request))
     return render(request, "vendedores/registro.html", {
         "form": form,
         "grupos": _grupos(),
         "seleccionadas": seleccionadas,
+        "next": _destino_registro(request) if request.GET.get("next") or request.POST.get("next") else "",
+        "modo": (request.POST.get("modo") or request.GET.get("tipo") or "").strip(),
+        "otra_cuenta": request.user.is_authenticated,
     })
 
 
@@ -189,11 +205,34 @@ def datos(request):
     })
 
 
-@login_required
+def publicar_producto(request):
+    vendedor = _vendedor(request.user)
+    if vendedor and vendedor.estado == "activo":
+        return redirect("nuevo_producto")
+    if vendedor:
+        messages.error(request, "Tu tienda fue retirada y no puede publicar.")
+        return redirect("panel_vendedor")
+    if request.user.is_authenticated:
+        return render(request, "vendedores/otra_cuenta.html", {"para": "publicar"})
+    return redirect("/vendedores/registro/?next=/vendedores/producto/nuevo/")
+
+
+def vender_mayor(request):
+    vendedor = _vendedor(request.user)
+    if vendedor and vendedor.es_proveedor:
+        return redirect("panel_vendedor")
+    if vendedor:
+        return render(request, "vendedores/vender_mayor.html", {"vendedor": vendedor})
+    if request.user.is_authenticated:
+        return render(request, "vendedores/otra_cuenta.html", {"para": "mayor"})
+    return redirect("/vendedores/registro/?tipo=mayorista&next=/vendedores/panel/")
+
+
+@login_required(login_url="registro_vendedor")
 def producto_form(request, pk=None):
     vendedor = _vendedor(request.user)
     if vendedor is None:
-        return redirect("registro_vendedor")
+        return redirect("/vendedores/registro/?next=/vendedores/producto/nuevo/")
     if vendedor.estado != "activo":
         messages.error(request, "Tu tienda fue retirada y no puede publicar.")
         return redirect("panel_vendedor")

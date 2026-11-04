@@ -56,7 +56,7 @@
     {% if producto.descripcion %}{{ producto.descripcion|linebreaks }}{% endif %}
 
     {% if vendedor_actual and producto.vendedor_id == vendedor_actual.id %}
-      <h3>Publicar este producto</h3>
+      <h3>Compartir este producto</h3>
       <p class="muted">El enlace abre esta ficha para que el cliente pida. En el celular, “estados” arma la imagen y la manda a WhatsApp, Instagram o Facebook.</p>
       {% include "compartir/_botones.html" with titulo_share=producto.titulo texto_share="Pide esto en ERA shop" url_share=request.path precio_share=producto.precio_vigente kicker_share=producto.vendedor.nombre_tienda %}
       <a class="btn sec" href="{% url 'estado_producto' producto.pk %}">Vista de estado</a>

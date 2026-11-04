@@ -25,7 +25,11 @@ def _nequi_valido(valor):
 
 
 class RegistroForm(forms.Form):
-    nombre_tienda = forms.CharField(label="Nombre de la tienda", max_length=160)
+    nombre_tienda = forms.CharField(
+        label="Nombre de la tienda o de quien vende",
+        max_length=160,
+        help_text="Sirve para una tienda física, una tienda virtual, una persona, un mayorista o un importador.",
+    )
     responsable = forms.CharField(label="Responsable", max_length=200)
     documento = forms.CharField(label="Cédula o NIT", max_length=40)
     email = forms.EmailField(label="Correo")
@@ -38,10 +42,18 @@ class RegistroForm(forms.Form):
         max_length=20,
         help_text="Celular de 10 dígitos. Ahí llega lo que queda después del porcentaje de ERA shop y de la tarifa de Wompi. No se muestra en el catálogo.",
     )
-    direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
+    direccion = forms.CharField(
+        label="Dirección de despacho",
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Si vendes virtual o eres persona, escribe desde dónde despachas. No hace falta un local.",
+    )
     ciudad = forms.CharField(label="Ciudad", max_length=100)
     departamento = forms.ChoiceField(label="Departamento", choices=DEPARTAMENTOS_CHOICES)
-    tipo = forms.ChoiceField(label="Tipo de vendedor", choices=TIPOS)
+    tipo = forms.ChoiceField(
+        label="Quién vende",
+        choices=TIPOS,
+        help_text="Persona, tienda física, tienda virtual, mayorista o importador. Cada uno publica lo que le corresponde.",
+    )
     rango_precio = forms.ChoiceField(
         label="Rango de precios de tu mercancía",
         choices=RANGOS,
@@ -97,7 +109,11 @@ class DatosVendedorForm(forms.Form):
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     ciudad = forms.CharField(label="Ciudad", max_length=100)
     departamento = forms.ChoiceField(label="Departamento", choices=DEPARTAMENTOS_CHOICES)
-    tipo = forms.ChoiceField(label="Tipo de vendedor", choices=TIPOS)
+    tipo = forms.ChoiceField(
+        label="Quién vende",
+        choices=TIPOS,
+        help_text="Mayorista e importador publican lista al por mayor. Persona y tienda virtual no necesitan local.",
+    )
 
     def clean_telefono(self):
         return _telefono_valido(self.cleaned_data["telefono"])

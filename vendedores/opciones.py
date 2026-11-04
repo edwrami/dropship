@@ -12,8 +12,9 @@ DEPARTAMENTOS_CHOICES = [("", "Selecciona")] + [(d, d) for d in DEPARTAMENTOS]
 TIPOS_PROVEEDOR = ("mayorista", "importador")
 
 TIPOS = [
-    ("persona", "Persona natural"),
-    ("empresa", "Empresa / tienda"),
+    ("persona", "Persona"),
+    ("virtual", "Tienda virtual"),
+    ("empresa", "Tienda física"),
     ("fabricante", "Fabricante"),
     ("importador", "Importador"),
     ("mayorista", "Mayorista"),

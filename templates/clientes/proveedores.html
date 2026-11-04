@@ -1,9 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Mayoristas e importadores · ERA shop{% endblock %}
 {% block content %}
-  <p class="kicker">Al por mayor</p>
+  <p class="kicker">Comprar al por mayor</p>
   <h2>Mayoristas e importadores</h2>
-  <p class="lede">Registra el establecimiento con todos sus datos, conéctate y abre la lista: precio, especificaciones y fotos si el proveedor las publicó.</p>
+  {% if cliente_actual %}
+    <p class="lede">Conéctate y abre la lista: precio, especificaciones y fotos si el proveedor las publicó. El pedido se arma sumando cantidades.</p>
+  {% elif vendedor_actual %}
+    <p class="lede">Estas son las listas al por mayor. Para pedirlas, el establecimiento se registra con su propio correo. Tu cuenta publica mercancía; no arma pedidos de establecimiento.</p>
+  {% elif comprador_actual %}
+    <p class="lede">Tu cuenta compra al detal. Para ver precios de mayorista e importador, registra el establecimiento con sus datos.</p>
+    <p><a class="btn" href="{% url 'registro_cliente' %}">Registrar el establecimiento</a></p>
+  {% else %}
+    <p class="lede">Registra el establecimiento con todos sus datos, conéctate y abre la lista: precio, especificaciones y fotos si el proveedor las publicó.</p>
+    <p><a class="btn" href="{% url 'registro_cliente' %}">Registrar el establecimiento</a></p>
+  {% endif %}
   <form class="filters-grid filters" method="get">
     <label>Tipo
       <select name="tipo">
@@ -34,8 +44,8 @@
                 <button class="btn" type="submit">Conectar</button>
               </form>
             {% endif %}
-          {% else %}
-            <a class="btn" href="{% url 'registro_cliente' %}">Registrar mi tienda</a>
+          {% elif not vendedor_actual and not comprador_actual %}
+            <a class="btn" href="{% url 'registro_cliente' %}">Registrar el establecimiento</a>
           {% endif %}
         </div>
       </article>

@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-  <p class="eyebrow">Tu vitrina</p>
+  <p class="eyebrow">{{ vendedor.get_tipo_display }}</p>
   <h2>{{ vendedor.nombre_tienda }}</h2>
+  {% if vendedor.tipo == "virtual" or vendedor.tipo == "persona" or vendedor.tipo == "dropshipper" %}
+    <p class="muted">Vendes sin local. La ciudad es desde donde despachas. Publicar producto abre la ficha completa.</p>
+  {% elif vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}
+    <p class="muted">Publicas lista al por mayor. Cada producto lleva precio de mostrador, precio al por mayor y cantidad mínima.</p>
+  {% endif %}
   {% if vendedor.slug %}
     <p class="muted">Publica la tienda. Quien pulse el enlace llega al catálogo de tu mercancía para pedir.</p>
     {% url 'tienda_publica' vendedor.slug as ruta_tienda %}
@@ -70,7 +75,7 @@
         <td>{{ p.visitas }}</td>
         <td>
           <a href="{% url 'editar_producto' p.pk %}">Editar</a>
-          <a href="{% url 'estado_producto' p.pk %}">Publicar</a>
+          <a href="{% url 'estado_producto' p.pk %}">Compartir</a>
           <form method="post" action="{% url 'ocultar_producto' p.pk %}" style="display:inline">{% csrf_token %}
             <button class="btn sec" type="submit">{% if p.activo %}Ocultar{% else %}Mostrar{% endif %}</button>
           </form>
