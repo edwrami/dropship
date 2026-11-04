@@ -4,7 +4,7 @@
     {% for foto in fotos %}
       <img src="{{ foto.url }}" alt="{{ producto.titulo }}, foto {{ forloop.counter }} de {{ fotos|length }}">
     {% empty %}
-      {% if producto.imagen %}<img src="{{ producto.imagen }}" alt="{{ producto.titulo }}">{% endif %}
+      {% if producto.imagen %}<img src="{{ producto.imagen }}" alt="{{ producto.titulo }}">{% else %}<p class="muted">Sin foto</p>{% endif %}
     {% endfor %}
   </div>
   {% if fotos|length > 1 %}

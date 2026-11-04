@@ -112,6 +112,18 @@ class ClienteTienda(models.Model):
         verbose_name = "tienda compradora"
         verbose_name_plural = "tiendas compradoras"
 
+    def registro_completo(self):
+        documento = "".join(ch for ch in (self.documento or "") if ch.isdigit())
+        return bool(
+            (self.nombre_tienda or "").strip()
+            and (self.responsable or "").strip()
+            and len(documento) >= 5
+            and (self.telefono or "").strip()
+            and (self.direccion or "").strip()
+            and (self.ciudad or "").strip()
+            and (self.departamento or "").strip()
+        )
+
     def __str__(self):
         return f"{self.nombre_tienda} · {self.ciudad}"
 

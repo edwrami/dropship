@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Registro de tienda · ERA shop{% endblock %}
 {% block content %}
-  <h2>Registro de tienda</h2>
-  <p class="muted">Para ver listas de precios al por mayor, fotos y especificaciones de mayoristas e importadores.</p>
+  <h2>Registro del establecimiento</h2>
+  <p class="muted">Para pedir en las listas de mayoristas e importadores hace falta este registro completo. Los datos quedan en ERA shop y se copian en cada pedido para el proveedor.</p>
   <form method="post" style="max-width:720px">{% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     {{ form.as_p }}
-    <button class="btn" type="submit">Crear cuenta de tienda</button>
+    <button class="btn" type="submit">Guardar y continuar</button>
   </form>
-  <p class="muted">¿Ya tienes cuenta? <a href="{% url 'entrar_cliente' %}">Entrar</a></p>
+  <p class="muted">¿Ya está registrado? <a href="{% url 'entrar_cliente' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Entrar</a></p>
 {% endblock %}

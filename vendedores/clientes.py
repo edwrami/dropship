@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 
 from pedidos.models import Pedido
 
-from .forms import DatosCompradorForm, RegistroClienteForm, RegistroCompradorForm
+from .forms import DatosClienteForm, DatosCompradorForm, RegistroClienteForm, RegistroCompradorForm
 from .models import ClienteTienda, Comprador, Conexion, Vendedor
 from .opciones import DEPARTAMENTOS, TIPOS_PROVEEDOR
 
@@ -50,7 +50,7 @@ def _proveedores():
 @transaction.atomic
 def registro_cliente(request):
     if _cliente(request.user):
-        return redirect("mis_proveedores")
+        return redirect(_siguiente(request, "/clientes/mis-proveedores/"))
     form = RegistroClienteForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
@@ -72,14 +72,17 @@ def registro_cliente(request):
             referencia=(data.get("referencia") or "").strip(),
         )
         login(request, user)
-        messages.success(request, "Tienda registrada. Ya puedes conectarte con mayoristas e importadores.")
-        return redirect("proveedores_mayor")
-    return render(request, "clientes/registro.html", {"form": form})
+        messages.success(request, "Establecimiento registrado. Esos datos quedan en ERA shop y se copian en cada pedido.")
+        return redirect(_siguiente(request, "/clientes/proveedores/"))
+    return render(request, "clientes/registro.html", {
+        "form": form,
+        "next": request.GET.get("next", ""),
+    })
 
 
 def entrar_cliente(request):
     if _cliente(request.user):
-        return redirect("mis_proveedores")
+        return redirect(_siguiente(request, "/clientes/mis-proveedores/"))
     error = ""
     if request.method == "POST":
         email = (request.POST.get("email") or "").strip().lower()
@@ -90,10 +93,13 @@ def entrar_cliente(request):
             login(request, user)
             if _cliente(user) is None:
                 logout(request)
-                error = "Esa cuenta es de vendedor. Entra desde Vender."
+                error = "Esa cuenta no es de un establecimiento. Entra por Registrarme o por Vender."
             else:
-                return redirect("mis_proveedores")
-    return render(request, "clientes/entrar.html", {"error": error})
+                return redirect(_siguiente(request, "/clientes/mis-proveedores/"))
+    return render(request, "clientes/entrar.html", {
+        "error": error,
+        "next": request.POST.get("next") or request.GET.get("next", ""),
+    })
 
 
 def proveedores_mayor(request):
@@ -283,19 +289,15 @@ def mis_proveedores(request):
     cliente = _cliente(request.user)
     if cliente is None:
         return redirect("registro_cliente")
-    if request.method == "POST":
-        cliente.direccion = (request.POST.get("direccion") or "").strip()
-        cliente.barrio = (request.POST.get("barrio") or "").strip()[:120]
-        cliente.referencia = (request.POST.get("referencia") or "").strip()[:200]
-        if not cliente.direccion:
-            messages.error(request, "Escribe la dirección de entrega.")
-        else:
-            cliente.save(update_fields=["direccion", "barrio", "referencia"])
-            messages.success(request, "Dirección guardada.")
+    form = DatosClienteForm(request.POST or None, instance=cliente)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Datos del establecimiento actualizados.")
         return redirect("mis_proveedores")
     conexiones = cliente.conexiones.select_related("proveedor").order_by("proveedor__nombre_tienda")
     return render(request, "clientes/mios.html", {
         "cliente": cliente,
+        "form": form,
         "conexiones": conexiones,
         "pedidos": pedidos_del_comprador(request, cliente),
     })

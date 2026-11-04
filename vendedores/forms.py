@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from productos.models import Producto
 
-from .models import Categoria, Comprador
+from .models import Categoria, ClienteTienda, Comprador
 from .opciones import CONDICIONES, DEPARTAMENTOS_CHOICES, RANGOS, TIPOS
 
 
@@ -284,7 +284,7 @@ class ProductoVendedorForm(forms.ModelForm):
 
 
 class RegistroClienteForm(forms.Form):
-    nombre_tienda = forms.CharField(label="Nombre de tu tienda", max_length=160)
+    nombre_tienda = forms.CharField(label="Nombre del establecimiento", max_length=160)
     responsable = forms.CharField(label="Responsable", max_length=200)
     documento = forms.CharField(label="Cédula o NIT", max_length=40)
     email = forms.EmailField(label="Correo")
@@ -306,6 +306,12 @@ class RegistroClienteForm(forms.Form):
     def clean_telefono(self):
         return _telefono_valido(self.cleaned_data["telefono"])
 
+    def clean_documento(self):
+        documento = "".join(ch for ch in self.cleaned_data["documento"] if ch.isdigit())
+        if len(documento) < 5:
+            raise forms.ValidationError("Escribe la cédula o el NIT.")
+        return documento
+
     def clean_departamento(self):
         valor = self.cleaned_data["departamento"]
         if not valor:
@@ -317,6 +323,36 @@ class RegistroClienteForm(forms.Form):
         if data.get("password") and data.get("password2") and data["password"] != data["password2"]:
             self.add_error("password2", "Las contraseñas no coinciden.")
         return data
+
+
+class DatosClienteForm(forms.ModelForm):
+    class Meta:
+        model = ClienteTienda
+        fields = [
+            "nombre_tienda", "responsable", "documento", "telefono",
+            "direccion", "barrio", "ciudad", "departamento", "referencia",
+        ]
+        labels = {
+            "nombre_tienda": "Nombre del establecimiento",
+            "responsable": "Responsable",
+            "documento": "Cédula o NIT",
+            "telefono": "Teléfono",
+            "direccion": "Dirección de entrega",
+            "barrio": "Barrio",
+            "ciudad": "Ciudad",
+            "departamento": "Departamento",
+            "referencia": "Referencia o apartamento",
+        }
+        widgets = {"direccion": forms.Textarea(attrs={"rows": 2})}
+
+    def clean_telefono(self):
+        return _telefono_valido(self.cleaned_data["telefono"])
+
+    def clean_documento(self):
+        documento = "".join(ch for ch in self.cleaned_data["documento"] if ch.isdigit())
+        if len(documento) < 5:
+            raise forms.ValidationError("Escribe la cédula o el NIT.")
+        return documento
 
 
 class RegistroCompradorForm(forms.Form):

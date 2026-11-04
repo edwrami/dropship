@@ -209,8 +209,6 @@ def producto_form(request, pk=None):
     if request.method == "POST" and form.is_valid():
         if len(archivos) > 3:
             form.add_error(None, "Puedes subir hasta 3 fotos por producto.")
-        elif not archivos and (instancia is None or not instancia.fotos.exists()):
-            form.add_error(None, "Sube de 1 a 3 fotos del producto.")
         else:
             try:
                 preparados = [extension(archivo) for archivo in archivos]
@@ -253,7 +251,7 @@ def producto_form(request, pk=None):
             producto.imagen = primera
             producto.save(update_fields=["imagen"])
         reclasificar_vendedor(vendedor)
-        messages.success(request, "Producto publicado con sus fotos.")
+        messages.success(request, "Producto publicado en la lista.")
         return redirect("panel_vendedor")
     return render(request, "vendedores/producto_form.html", {"form": form, "producto": instancia})
 

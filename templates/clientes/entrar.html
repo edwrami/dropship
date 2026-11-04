@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Entrar como tienda · ERA shop{% endblock %}
 {% block content %}
-  <h2>Entrar como tienda</h2>
-  <p class="muted">Esta entrada es para tiendas que compran al por mayor.</p>
+  <h2>Entrar como establecimiento</h2>
+  <p class="muted">Esta entrada es para establecimientos que piden en las listas de mayoristas e importadores.</p>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   <form method="post" style="max-width:420px">{% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     <label>Correo<input type="email" name="email" required></label>
     <label>Contraseña<input type="password" name="password" required></label>
     <p><button class="btn" type="submit">Entrar</button></p>
   </form>
-  <p class="muted">¿Aún no estás? <a href="{% url 'registro_cliente' %}">Registra tu tienda</a></p>
+  <p class="muted">¿Aún no está registrado? <a href="{% url 'registro_cliente' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Registrar el establecimiento</a></p>
 {% endblock %}

@@ -64,17 +64,18 @@
 
     <h3>Hacer pedido</h3>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    {% if comprador_actual or cliente_actual.direccion %}
+    {% if cliente_completo or comprador_actual %}
       <div class="card">
-        {% if comprador_actual %}
+        {% if cliente_completo %}
+          <p><strong>{{ cliente_actual.nombre_tienda }}</strong> · {{ cliente_actual.responsable }}</p>
+          <p>Cédula o NIT {{ cliente_actual.documento }} · {{ cliente_actual.telefono }}</p>
+          <p>{{ cliente_actual.direccion }}{% if cliente_actual.barrio %}, {{ cliente_actual.barrio }}{% endif %} · {{ cliente_actual.ciudad }}, {{ cliente_actual.departamento }}</p>
+          <p><a href="{% url 'mis_proveedores' %}">Corregir los datos del establecimiento</a></p>
+        {% else %}
           <p><strong>{{ comprador_actual.nombre }}</strong> · cédula {{ comprador_actual.documento }}</p>
           <p>{{ comprador_actual.direccion }}{% if comprador_actual.barrio %}, {{ comprador_actual.barrio }}{% endif %} · {{ comprador_actual.ciudad }}, {{ comprador_actual.departamento }}</p>
           <p>{{ comprador_actual.telefono }} · {{ comprador_actual.user.email }}</p>
           <p><a href="{% url 'datos_comprador' %}">Corregir mis datos</a></p>
-        {% else %}
-          <p><strong>{{ cliente_actual.responsable }}</strong> · {{ cliente_actual.nombre_tienda }}</p>
-          <p>{{ cliente_actual.direccion }}{% if cliente_actual.barrio %}, {{ cliente_actual.barrio }}{% endif %} · {{ cliente_actual.ciudad }}</p>
-          <p><a href="{% url 'mis_proveedores' %}">Corregir la dirección</a></p>
         {% endif %}
       </div>
       <form method="post" action="{% url 'crear_pedido' producto.pk %}">
@@ -84,14 +85,18 @@
         <button class="btn" type="submit">Hacer pedido y pagar</button>
       </form>
     {% elif cliente_actual %}
-      <p>Tu tienda ya está registrada. Completa la dirección de entrega antes de pedir.</p>
-      <p><a class="btn" href="{% url 'mis_proveedores' %}">Completar mis datos</a></p>
+      <p>El establecimiento ya tiene cuenta. Completa nombre, responsable, cédula o NIT, teléfono, dirección y ciudad antes de pedir.</p>
+      <p><a class="btn" href="{% url 'mis_proveedores' %}">Completar el registro</a></p>
     {% else %}
       <p>Antes de pedir, regístrate con tu nombre, cédula, teléfono y dirección. Esos datos quedan guardados para ERA shop y para la tienda.</p>
       <p>
         <a class="btn" href="{% url 'registro_comprador' %}?next={{ request.path }}">Registrarme para pedir</a>
         <a class="btn sec" href="{% url 'entrar_comprador' %}?next={{ request.path }}">Ya tengo cuenta</a>
       </p>
+      {% if producto.precio_mayor_cop %}
+        <p>Si pides como establecimiento, el registro lleva el nombre del negocio, el responsable, la cédula o el NIT y la dirección.</p>
+        <p><a class="btn sec" href="{% url 'registro_cliente' %}?next={{ request.path }}">Registrar el establecimiento</a></p>
+      {% endif %}
     {% endif %}
   </div>
 </article>

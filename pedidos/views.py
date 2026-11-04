@@ -71,7 +71,7 @@ def _perfil_comprador(request):
         tienda = request.user.cliente_tienda
     except ClienteTienda.DoesNotExist:
         tienda = None
-    if tienda is None or not (tienda.direccion or "").strip():
+    if tienda is None or not tienda.registro_completo():
         return None
     return {
         "comprador": None,

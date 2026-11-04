@@ -31,6 +31,7 @@ def marketplace(request):
         "dias_liquidacion": getattr(settings, "DIAS_LIQUIDACION", 5),
         "vendedor_actual": vendedor,
         "cliente_actual": cliente,
+        "cliente_completo": bool(cliente and cliente.registro_completo()),
         "comprador_actual": comprador,
         "visitas_sitio": CuentaPlataforma.objects.filter(pk=1).values_list("visitas", flat=True).first() or 0,
     }

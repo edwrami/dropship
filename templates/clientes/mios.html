@@ -4,13 +4,12 @@
   <p class="kicker">{{ cliente.ciudad }}</p>
   <h2>{{ cliente.nombre_tienda }}</h2>
   <p class="muted">Proveedores con los que estás conectado. Abre cada lista para ver precios, fotos y especificaciones.</p>
-  <h3>Dirección de entrega</h3>
-  <p class="muted">Hace falta para pedir. Queda guardada en tu cuenta y se copia en cada pedido.</p>
-  <form method="post" style="max-width:640px">{% csrf_token %}
-    <label>Dirección<textarea name="direccion" required>{{ cliente.direccion }}</textarea></label>
-    <label>Barrio<input name="barrio" value="{{ cliente.barrio }}"></label>
-    <label>Referencia<input name="referencia" value="{{ cliente.referencia }}"></label>
-    <button class="btn" type="submit">Guardar dirección</button>
+  <h3>Datos del establecimiento</h3>
+  {% if not cliente_completo %}<div class="error">Completa nombre, responsable, cédula o NIT, teléfono, dirección y ciudad antes de pedir.</div>{% endif %}
+  <p class="muted">Estos datos quedan en ERA shop y se copian en cada pedido al mayorista o importador.</p>
+  <form method="post" style="max-width:720px">{% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn" type="submit">Guardar datos</button>
   </form>
   <h3>Historial de compras</h3>
   <p class="muted">Aquí está todo lo que has pedido con esta cuenta, con este correo o desde este navegador. La conversación con la tienda sigue dentro de cada pedido.</p>

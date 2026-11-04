@@ -7,7 +7,7 @@
     {{ form.as_p }}
     <fieldset>
       <legend>Fotos del producto</legend>
-      <p class="muted">De 1 a 3 fotos JPG, PNG o WEBP, de máximo 5 MB cada una. En la ficha se deslizan para ver la siguiente.</p>
+      <p class="muted">Las fotos son opcionales. Puedes publicar la lista sin fotos, o subir de 1 a 3 JPG, PNG o WEBP, de máximo 5 MB cada una.</p>
       {% if producto and producto.fotos.all %}
         <div class="thumbs">
           {% for foto in producto.fotos.all %}

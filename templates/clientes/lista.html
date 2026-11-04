@@ -31,7 +31,11 @@
             {% if p.controla_stock %}<li>Disponibles: {{ p.stock }}</li>{% endif %}
           </ul>
           {% if p.descripcion %}<div class="muted">{{ p.descripcion|linebreaks }}</div>{% endif %}
-          <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir desde {{ p.cantidad_minima }}</a>
+          {% if cliente_completo %}
+            <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir desde {{ p.cantidad_minima }}</a>
+          {% else %}
+            <a class="btn" href="{% url 'mis_proveedores' %}">Completa el registro para pedir</a>
+          {% endif %}
         </div>
       </article>
     {% empty %}
