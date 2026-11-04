@@ -244,7 +244,7 @@ def estado_producto(request, pk):
         "modo": "producto",
         "titulo": producto.titulo,
         "kicker": kicker,
-        "precio": f"${producto.precio_final_cop:,.0f} COP".replace(",", "."),
+        "precio": f"${producto.precio_vigente:,.0f} COP".replace(",", "."),
         "detalle": producto.entrega_texto or "Pide en ERA shop",
         "enlace": reverse("detalle_producto", args=[producto.pk]),
         "imagen": producto.imagen,

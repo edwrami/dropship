@@ -10,6 +10,7 @@
 </div>
 <script>
 (function () {
+  function iniciar() {
   var caja = document.getElementById("cuenta-descuento");
   if (!caja) return;
   var pct = Number(caja.dataset.pct) || 10;
@@ -76,5 +77,8 @@
     pintar();
   });
   pintar();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar);
+  else iniciar();
 })();
 </script>

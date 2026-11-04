@@ -193,7 +193,7 @@ class ProductoVendedorForm(forms.ModelForm):
         self.fields["promo_hasta"].required = False
         self.fields["promo_hasta"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
         self.fields["promo_hasta"].widget.format = "%Y-%m-%d"
-        if self.instance.pk and not self.instance.controla_stock:
+        if not self.instance.pk or not self.instance.controla_stock:
             self.initial["stock"] = None
         self.fields["precio_costo"].required = False
         self.fields["marca"].required = False
