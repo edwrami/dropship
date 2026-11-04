@@ -84,6 +84,7 @@ def _peso(categoria, default=0.35):
 
 
 def cargar_productos_nuevos():
+    return 0
     """Busca mayorista, publica solo si flete+margen dejan un precio creíble."""
     quitados = _quitar_mal_negocio()
     publicados = 0
