@@ -1,5 +1,6 @@
 ﻿from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from vendedores.opciones import CONDICIONES, DEPARTAMENTOS_CHOICES, banda_precio
 
@@ -57,6 +58,8 @@ class Producto(models.Model):
 
     precio_venta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     precio_final_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    precio_promo_cop = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    promo_hasta = models.DateField(null=True, blank=True)
     precio_mayor_cop = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     cantidad_minima = models.PositiveIntegerField(default=1)
     unidad_empaque = models.CharField(max_length=80, blank=True)
@@ -91,6 +94,22 @@ class Producto(models.Model):
         self.precio_final_cop = calc["precio_final_cop"]
         self.banda_precio = banda_precio(self.precio_final_cop)
         super().save(*args, **kwargs)
+
+    @property
+    def en_promocion(self):
+        if not self.precio_promo_cop or self.precio_promo_cop <= 0:
+            return False
+        if self.precio_final_cop and self.precio_promo_cop >= self.precio_final_cop:
+            return False
+        if self.promo_hasta and self.promo_hasta < timezone.localdate():
+            return False
+        return True
+
+    @property
+    def precio_vigente(self):
+        if self.en_promocion:
+            return self.precio_promo_cop
+        return self.precio_final_cop
 
     @property
     def categoria_es(self):

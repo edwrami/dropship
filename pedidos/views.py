@@ -97,7 +97,7 @@ def crear_pedido(request, producto_id):
         if producto.controla_stock and producto.stock < cantidad:
             return _error("No hay suficientes unidades.")
 
-        precio = Decimal(producto.precio_final_cop)
+        precio = Decimal(producto.precio_vigente)
         if producto.precio_mayor_cop and producto.vendedor_id and request.user.is_authenticated:
             from vendedores.models import ClienteTienda, Conexion
             try:
@@ -115,7 +115,7 @@ def crear_pedido(request, producto_id):
                 return _error("En mostrador el máximo por pedido es 20. El precio al por mayor aplica si tu tienda está conectada y pides el mínimo.")
         elif cantidad > 20:
             cantidad = 20
-            precio = Decimal(producto.precio_final_cop)
+            precio = Decimal(producto.precio_vigente)
         envio = Decimal("0")
         if not producto.envio_gratis:
             envio = Decimal(producto.costo_envio_cop or 0)

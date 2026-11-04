@@ -211,7 +211,6 @@ def producto_form(request, pk=None):
         producto.tienda = vendedor.nombre_tienda
         producto.moneda = "COP"
         producto.margen_pct = 0
-        producto.controla_stock = True
         producto.activo = True
         if not producto.precio_costo:
             producto.precio_costo = 0

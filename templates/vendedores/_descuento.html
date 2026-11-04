@@ -21,6 +21,7 @@
   var resultado = document.getElementById("resultado-precio");
   var usar = document.getElementById("usar-precio");
   var precioCampo = document.getElementById("id_precio_final_cop");
+  var promoCampo = document.getElementById("id_precio_promo_cop");
   var costoCampo = document.getElementById("id_precio_costo");
   function dinero(n) {
     return "$" + Math.round(n).toLocaleString("es-CO");
@@ -53,7 +54,7 @@
     var base = leer(costo) || leer(costoCampo);
     var minimoValor = base ? minimoPara(base) : 0;
     minimo.textContent = minimoValor ? dinero(minimoValor) : "—";
-    var precio = leer(precioCampo) || minimoValor;
+    var precio = leer(promoCampo) || leer(precioCampo) || minimoValor;
     if (!precio) {
       resultado.textContent = "Escribe lo que te cuesta, o el precio del producto, para ver los descuentos.";
       return;
@@ -64,6 +65,7 @@
   }
   costo.addEventListener("input", pintar);
   if (precioCampo) precioCampo.addEventListener("input", pintar);
+  if (promoCampo) promoCampo.addEventListener("input", pintar);
   if (costoCampo) costoCampo.addEventListener("input", pintar);
   if (!precioCampo) usar.hidden = true;
   usar.addEventListener("click", function () {

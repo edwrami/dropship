@@ -17,7 +17,7 @@
           <p class="kicker">{{ p.categoria_es|default:"Producto" }}</p>
           <h3>{{ p.titulo }}</h3>
           <p class="price">Al por mayor ${{ p.precio_mayor_cop|floatformat:0|intcomma }} COP</p>
-          <p class="meta">Mostrador ${{ p.precio_final_cop|floatformat:0|intcomma }} · mínimo {{ p.cantidad_minima }}{% if p.unidad_empaque %} · {{ p.unidad_empaque }}{% endif %}</p>
+          <p class="meta">{% if p.en_promocion %}Promoción ${{ p.precio_promo_cop|floatformat:0|intcomma }} · normal ${{ p.precio_final_cop|floatformat:0|intcomma }}{% else %}Mostrador ${{ p.precio_final_cop|floatformat:0|intcomma }}{% endif %} · mínimo {{ p.cantidad_minima }}{% if p.unidad_empaque %} · {{ p.unidad_empaque }}{% endif %}</p>
           <ul class="specs">
             {% if p.marca %}<li>Marca: {{ p.marca }}</li>{% endif %}
             <li>Condición: {{ p.get_condicion_display }}</li>

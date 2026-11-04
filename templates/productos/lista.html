@@ -103,7 +103,12 @@
       <div class="body">
         <p class="kicker">{{ p.categoria_es|default:"ERA shop" }}</p>
         <h3>{{ p.titulo|truncatechars:64 }}</h3>
-        <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
+        {% if p.en_promocion %}
+          <p class="kicker">Promoción</p>
+          <p class="price">${{ p.precio_promo_cop|floatformat:0|intcomma }} <s>${{ p.precio_final_cop|floatformat:0|intcomma }}</s></p>
+        {% else %}
+          <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
+        {% endif %}
         <p class="meta">
           {% if p.ciudad_despacho %}{{ p.ciudad_despacho }}{% endif %}
           {% if p.entrega_texto %} · {{ p.entrega_texto }}{% endif %}

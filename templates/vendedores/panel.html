@@ -63,8 +63,8 @@
         <td>{{ p.categoria_es }}</td>
         <td>{{ p.ciudad_despacho }}</td>
         <td>{{ p.entrega_texto }}</td>
-        <td>${{ p.precio_final_cop }}</td>
-        <td>{{ p.stock }}</td>
+        <td>${{ p.precio_vigente }}{% if p.en_promocion %}<br><small>Promoción, normal ${{ p.precio_final_cop }}</small>{% endif %}</td>
+        <td>{% if p.controla_stock %}{{ p.stock }}{% else %}Sin límite{% endif %}</td>
         <td>
           <a href="{% url 'editar_producto' p.pk %}">Editar</a>
           <a href="{% url 'estado_producto' p.pk %}">Publicar</a>

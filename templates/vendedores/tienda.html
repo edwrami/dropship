@@ -35,7 +35,12 @@
       <div class="body">
         <p class="kicker">{{ p.categoria_es|default:"Producto" }}</p>
         <h3>{{ p.titulo|truncatechars:64 }}</h3>
-        <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
+        {% if p.en_promocion %}
+          <p class="kicker">Promoción</p>
+          <p class="price">${{ p.precio_promo_cop|floatformat:0|intcomma }} <s>${{ p.precio_final_cop|floatformat:0|intcomma }}</s></p>
+        {% else %}
+          <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
+        {% endif %}
         <p class="meta">{% if p.entrega_texto %}Entrega {{ p.entrega_texto }}{% endif %}</p>
         <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir</a>
       </div>

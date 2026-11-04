@@ -1,12 +1,12 @@
 ﻿{% extends "base.html" %}
 {% load humanize %}
 {% block title %}{{ producto.titulo }} · ERA shop{% endblock %}
-{% block description %}{{ producto.titulo }} por ${{ producto.precio_final_cop|floatformat:0 }} COP en ERA shop.{% endblock %}
+{% block description %}{{ producto.titulo }} por ${{ producto.precio_vigente|floatformat:0 }} COP en ERA shop.{% endblock %}
 {% block meta %}
 <meta property="og:site_name" content="ERA shop">
 <meta property="og:type" content="product">
 <meta property="og:title" content="{{ producto.titulo }}">
-<meta property="og:description" content="Pide en ERA shop · ${{ producto.precio_final_cop|floatformat:0 }} COP{% if producto.ciudad_despacho %} · {{ producto.ciudad_despacho }}{% endif %}">
+<meta property="og:description" content="Pide en ERA shop · ${{ producto.precio_vigente|floatformat:0 }} COP{% if producto.ciudad_despacho %} · {{ producto.ciudad_despacho }}{% endif %}">
 <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{% url 'detalle_producto' producto.pk %}">
 {% if producto.fotos.all %}<meta property="og:image" content="{{ producto.fotos.all.0.url }}">{% elif producto.imagen %}<meta property="og:image" content="{{ producto.imagen }}">{% endif %}
 {% endblock %}
@@ -18,7 +18,12 @@
   <div>
     <p class="kicker">{% if producto.rubro.padre %}{{ producto.rubro.padre.nombre }} · {% endif %}{{ producto.categoria_es|default:"ERA shop" }}</p>
     <h2>{{ producto.titulo }}</h2>
-    <p class="price">Mostrador ${{ producto.precio_final_cop|floatformat:0|intcomma }} COP</p>
+    {% if producto.en_promocion %}
+      <p class="kicker">Promoción{% if producto.promo_hasta %} hasta {{ producto.promo_hasta|date:"d/m/Y" }}{% endif %}</p>
+      <p class="price">${{ producto.precio_promo_cop|floatformat:0|intcomma }} COP <s>${{ producto.precio_final_cop|floatformat:0|intcomma }}</s></p>
+    {% else %}
+      <p class="price">Mostrador ${{ producto.precio_final_cop|floatformat:0|intcomma }} COP</p>
+    {% endif %}
     {% if ve_mayor %}
       <p class="price">Al por mayor ${{ producto.precio_mayor_cop|floatformat:0|intcomma }} COP · mínimo {{ producto.cantidad_minima }}{% if producto.unidad_empaque %} · {{ producto.unidad_empaque }}{% endif %}</p>
     {% elif producto.precio_mayor_cop %}
@@ -47,7 +52,7 @@
     {% if vendedor_actual and producto.vendedor_id == vendedor_actual.id %}
       <h3>Publicar este producto</h3>
       <p class="muted">El enlace abre esta ficha para que el cliente pida. En el celular, “estados” arma la imagen y la manda a WhatsApp, Instagram o Facebook.</p>
-      {% include "compartir/_botones.html" with titulo_share=producto.titulo texto_share="Pide esto en ERA shop" url_share=request.path precio_share=producto.precio_final_cop kicker_share=producto.vendedor.nombre_tienda %}
+      {% include "compartir/_botones.html" with titulo_share=producto.titulo texto_share="Pide esto en ERA shop" url_share=request.path precio_share=producto.precio_vigente kicker_share=producto.vendedor.nombre_tienda %}
       <a class="btn sec" href="{% url 'estado_producto' producto.pk %}">Vista de estado</a>
     {% endif %}
 

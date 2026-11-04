@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 from productos.models import Producto
 
@@ -120,7 +121,7 @@ class ProductoVendedorForm(forms.ModelForm):
         fields = [
             "titulo", "descripcion", "rubro", "marca", "condicion",
             "material", "color", "talla", "sku", "stock",
-            "precio_final_cop", "precio_costo", "precio_mayor_cop",
+            "precio_final_cop", "precio_promo_cop", "promo_hasta", "precio_costo", "precio_mayor_cop",
             "cantidad_minima", "unidad_empaque", "peso_libras",
             "ciudad_despacho", "departamento_despacho",
             "tiempo_entrega_min", "tiempo_entrega_max",
@@ -137,7 +138,9 @@ class ProductoVendedorForm(forms.ModelForm):
             "talla": "Talla",
             "sku": "SKU o referencia",
             "stock": "Unidades disponibles",
-            "precio_final_cop": "Precio que paga el cliente (COP)",
+            "precio_final_cop": "Precio normal (COP)",
+            "precio_promo_cop": "Precio en promoción (COP)",
+            "promo_hasta": "La promoción termina",
             "precio_costo": "Tu costo (privado)",
             "precio_mayor_cop": "Precio al por mayor (COP)",
             "cantidad_minima": "Cantidad mínima al por mayor",
@@ -153,7 +156,10 @@ class ProductoVendedorForm(forms.ModelForm):
         }
         help_texts = {
             "descripcion": "Qué es, materiales, medidas, qué incluye y cómo se usa. Mínimo 80 caracteres.",
-            "precio_final_cop": "Puede ir ya con el 10% y la tarifa de Wompi incluidos. El cliente paga este único valor.",
+            "stock": "Déjalo vacío para publicar sin límite de unidades.",
+            "precio_final_cop": "Puede ir ya con el 10% y la tarifa de Wompi incluidos.",
+            "precio_promo_cop": "Opcional. Menor que el precio normal. El cliente paga este valor mientras la promoción esté vigente. El 10% y Wompi se calculan sobre él.",
+            "promo_hasta": "Opcional. Si la dejas vacía, la promoción sigue hasta que la quites.",
             "precio_costo": "El cliente no ve este valor. Sirve para avisarte si el precio te deja pérdida.",
             "precio_mayor_cop": "Solo lo ven las tiendas conectadas contigo. El catálogo público sigue mostrando el precio de mostrador.",
             "unidad_empaque": "Por ejemplo: caja x 12, docena, bulto.",
@@ -161,6 +167,7 @@ class ProductoVendedorForm(forms.ModelForm):
         widgets = {
             "descripcion": forms.Textarea(attrs={"rows": 6}),
             "condicion": forms.Select(choices=CONDICIONES),
+            "promo_hasta": forms.DateInput(attrs={"type": "date"}),
         }
 
     def __init__(self, *args, mayorista=False, **kwargs):
@@ -177,10 +184,17 @@ class ProductoVendedorForm(forms.ModelForm):
         )
         self.fields["rubro"].label_from_instance = lambda obj: f"{obj.padre.nombre} — {obj.nombre}"
         self.fields["rubro"].empty_label = "Elige la categoría"
-        for nombre in ("titulo", "descripcion", "rubro", "stock", "precio_final_cop",
+        for nombre in ("titulo", "descripcion", "rubro", "precio_final_cop",
                        "ciudad_despacho", "departamento_despacho",
                        "tiempo_entrega_min", "tiempo_entrega_max"):
             self.fields[nombre].required = True
+        self.fields["stock"].required = False
+        self.fields["precio_promo_cop"].required = False
+        self.fields["promo_hasta"].required = False
+        self.fields["promo_hasta"].input_formats = ["%Y-%m-%d", "%d/%m/%Y"]
+        self.fields["promo_hasta"].widget.format = "%Y-%m-%d"
+        if self.instance.pk and not self.instance.controla_stock:
+            self.initial["stock"] = None
         self.fields["precio_costo"].required = False
         self.fields["marca"].required = False
 
@@ -206,12 +220,26 @@ class ProductoVendedorForm(forms.ModelForm):
 
     def clean_stock(self):
         stock = self.cleaned_data.get("stock")
-        if stock is None or stock < 0:
-            raise forms.ValidationError("Indica cuántas unidades tienes.")
+        if stock is None:
+            return None
+        if stock < 0:
+            raise forms.ValidationError("Las unidades no pueden ser negativas.")
         return stock
 
     def clean(self):
         data = super().clean()
+        promo = data.get("precio_promo_cop")
+        precio = data.get("precio_final_cop")
+        hasta = data.get("promo_hasta")
+        if promo is not None:
+            if promo <= 0:
+                self.add_error("precio_promo_cop", "El precio en promoción debe ser mayor que cero.")
+            elif precio and promo >= precio:
+                self.add_error("precio_promo_cop", "La promoción tiene que ser menor que el precio normal.")
+        elif hasta:
+            self.add_error("precio_promo_cop", "Escribe el precio en promoción o quita la fecha.")
+        if hasta and hasta < timezone.localdate():
+            self.add_error("promo_hasta", "Esa fecha ya pasó.")
         minimo = data.get("tiempo_entrega_min")
         maximo = data.get("tiempo_entrega_max")
         if minimo is not None and maximo is not None and maximo < minimo:
@@ -226,6 +254,21 @@ class ProductoVendedorForm(forms.ModelForm):
             if minimo_unidades is None or minimo_unidades < 1:
                 self.add_error("cantidad_minima", "La cantidad mínima es al menos 1.")
         return data
+
+    def save(self, commit=True):
+        stock_anterior = self.instance.stock if self.instance.pk else 0
+        producto = super().save(commit=False)
+        stock = self.cleaned_data.get("stock")
+        if stock is None:
+            producto.controla_stock = False
+            producto.stock = stock_anterior or 0
+        else:
+            producto.controla_stock = True
+            producto.stock = stock
+        if commit:
+            producto.save()
+            self.save_m2m()
+        return producto
 
 
 class RegistroClienteForm(forms.Form):
