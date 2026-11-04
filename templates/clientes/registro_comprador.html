@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Registro para pedir · ERA shop{% endblock %}
+{% block content %}
+  <h2>Registro para pedir</h2>
+  <p class="muted">Estos datos quedan guardados en ERA shop y se copian en cada pedido para la tienda. Sin este registro no se puede ordenar.</p>
+  <form method="post" style="max-width:720px">{% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {{ form.as_p }}
+    <button class="btn" type="submit">Guardar y continuar</button>
+  </form>
+  <p class="muted">¿Ya te registraste? <a href="{% url 'entrar_comprador' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Entrar</a></p>
+{% endblock %}

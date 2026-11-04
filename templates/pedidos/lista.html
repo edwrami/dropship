@@ -138,9 +138,12 @@
           {% else %}Sin vendedor{% endif %}
         </td>
         <td>
-          {{ p.cliente_nombre }}<br>
+          {{ p.cliente_nombre }}{% if p.cliente_documento %}<br><small>Cédula {{ p.cliente_documento }}</small>{% endif %}<br>
           <small>{{ p.cliente_telefono }}{% if p.cliente_email %} · {{ p.cliente_email }}{% endif %}<br>
-          {{ p.cliente_direccion }} · {{ p.cliente_ciudad }}</small>
+          {{ p.cliente_direccion }}{% if p.cliente_barrio %}, {{ p.cliente_barrio }}{% endif %} · {{ p.cliente_ciudad }}{% if p.cliente_departamento %}, {{ p.cliente_departamento }}{% endif %}
+          {% if p.transportadora %}<br>{{ p.transportadora }} · guía {{ p.tracking }}{% endif %}
+          {% if p.estado == "entregado" and p.entrega_recibio %}<br>Entregado a {{ p.entrega_recibio }}{% endif %}
+          </small>
         </td>
         <td>{{ p.producto.titulo|truncatechars:40 }}{% if p.variante %}<br><small>{{ p.variante }}</small>{% endif %}</td>
         <td>{{ p.cantidad }}</td>

@@ -26,7 +26,7 @@
             {% if p.talla %}<li>Talla: {{ p.talla }}</li>{% endif %}
             {% if p.sku %}<li>Referencia: {{ p.sku }}</li>{% endif %}
             {% if p.entrega_texto %}<li>Entrega: {{ p.entrega_texto }}</li>{% endif %}
-            <li>{% if p.envio_gratis %}Envío gratis{% else %}Envío ${{ p.costo_envio_cop|floatformat:0|intcomma }}{% endif %}</li>
+            <li>{% if p.modo_envio == "contraentrega" %}Envío contraentrega{% elif p.modo_envio == "aparte" %}Envío ${{ p.costo_envio_cop|floatformat:0|intcomma }}{% else %}Envío incluido en el precio{% endif %}</li>
             {% if p.garantia_dias %}<li>Garantía: {{ p.garantia_dias }} días</li>{% endif %}
             {% if p.controla_stock %}<li>Disponibles: {{ p.stock }}</li>{% endif %}
           </ul>

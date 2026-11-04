@@ -48,7 +48,26 @@ class Pedido(models.Model):
     cliente_telefono = models.CharField(max_length=50)
     cliente_email = models.EmailField(blank=True)
     cliente_direccion = models.TextField()
+    cliente_barrio = models.CharField(max_length=120, blank=True)
     cliente_ciudad = models.CharField(max_length=100)
+    cliente_departamento = models.CharField(max_length=60, blank=True)
+    cliente_documento = models.CharField(max_length=40, blank=True)
+    cliente_referencia = models.CharField(max_length=200, blank=True)
+    comprador = models.ForeignKey(
+        "vendedores.Comprador", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="pedidos",
+    )
+    modo_envio = models.CharField(max_length=20, blank=True)
+    envio_cop = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    transportadora = models.CharField(max_length=120, blank=True)
+    fecha_despacho = models.DateField(null=True, blank=True)
+    recibe_nombre = models.CharField(max_length=200, blank=True)
+    recibe_documento = models.CharField(max_length=40, blank=True)
+    recibe_telefono = models.CharField(max_length=50, blank=True)
+    detalle_envio = models.CharField(max_length=300, blank=True)
+    entrega_recibio = models.CharField(max_length=200, blank=True)
+    entrega_documento = models.CharField(max_length=40, blank=True)
+    entrega_nota = models.CharField(max_length=300, blank=True)
 
     clave_contacto = models.CharField(max_length=64, blank=True)
     contacto_responsable = models.CharField(max_length=200, blank=True)

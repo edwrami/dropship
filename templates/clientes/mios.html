@@ -4,6 +4,14 @@
   <p class="kicker">{{ cliente.ciudad }}</p>
   <h2>{{ cliente.nombre_tienda }}</h2>
   <p class="muted">Proveedores con los que estás conectado. Abre cada lista para ver precios, fotos y especificaciones.</p>
+  <h3>Dirección de entrega</h3>
+  <p class="muted">Hace falta para pedir. Queda guardada en tu cuenta y se copia en cada pedido.</p>
+  <form method="post" style="max-width:640px">{% csrf_token %}
+    <label>Dirección<textarea name="direccion" required>{{ cliente.direccion }}</textarea></label>
+    <label>Barrio<input name="barrio" value="{{ cliente.barrio }}"></label>
+    <label>Referencia<input name="referencia" value="{{ cliente.referencia }}"></label>
+    <button class="btn" type="submit">Guardar dirección</button>
+  </form>
   <h3>Historial de compras</h3>
   <p class="muted">Aquí está todo lo que has pedido con esta cuenta, con este correo o desde este navegador. La conversación con la tienda sigue dentro de cada pedido.</p>
   {% include "clientes/_historial.html" %}

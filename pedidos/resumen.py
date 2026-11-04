@@ -37,10 +37,16 @@ def pdf_pedido(pedido):
         if giro.destino_nequi:
             lineas.append(f"Nequi de la tienda: {giro.destino_nequi}")
     if pedido.tracking:
-        lineas.append(f"Guia: {pedido.tracking}")
+        lineas.append(f"Guia: {pedido.transportadora} {pedido.tracking}")
+    if pedido.fecha_despacho:
+        lineas.append(f"Despacho: {pedido.fecha_despacho:%d/%m/%Y}")
+    if pedido.entrega_recibio:
+        lineas.append(f"Entregado a: {pedido.entrega_recibio}")
     if pedido.vendedor_id:
         lineas.append(f"Tienda: {pedido.vendedor.nombre_tienda} · {pedido.vendedor.ciudad}")
     lineas.append(f"Cliente: {pedido.cliente_nombre}")
+    if pedido.cliente_documento:
+        lineas.append(f"Cedula: {pedido.cliente_documento}")
     lineas.append(f"Entrega: {pedido.cliente_direccion[:90]}")
     lineas.append(pedido.cliente_ciudad)
     if pedido.variante:

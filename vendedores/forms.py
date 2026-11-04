@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from productos.models import Producto
 
-from .models import Categoria
+from .models import Categoria, Comprador
 from .opciones import CONDICIONES, DEPARTAMENTOS_CHOICES, RANGOS, TIPOS
 
 
@@ -125,7 +125,7 @@ class ProductoVendedorForm(forms.ModelForm):
             "cantidad_minima", "unidad_empaque", "peso_libras",
             "ciudad_despacho", "departamento_despacho",
             "tiempo_entrega_min", "tiempo_entrega_max",
-            "envio_gratis", "costo_envio_cop", "garantia_dias",
+            "modo_envio", "costo_envio_cop", "garantia_dias",
         ]
         labels = {
             "titulo": "Nombre del producto",
@@ -150,7 +150,7 @@ class ProductoVendedorForm(forms.ModelForm):
             "departamento_despacho": "Departamento de despacho",
             "tiempo_entrega_min": "Entrega mínima (días)",
             "tiempo_entrega_max": "Entrega máxima (días)",
-            "envio_gratis": "Envío gratis",
+            "modo_envio": "Envío",
             "costo_envio_cop": "Costo de envío (COP)",
             "garantia_dias": "Garantía (días)",
         }
@@ -163,6 +163,8 @@ class ProductoVendedorForm(forms.ModelForm):
             "precio_costo": "El cliente no ve este valor. Sirve para avisarte si el precio te deja pérdida.",
             "precio_mayor_cop": "Solo lo ven las tiendas conectadas contigo. El catálogo público sigue mostrando el precio de mostrador.",
             "unidad_empaque": "Por ejemplo: caja x 12, docena, bulto.",
+            "modo_envio": "Si el precio ya incluye el envío, elige esa opción. Si se cobra aparte, escribe el valor. Si el cliente paga el envío al recibirlo, elige contraentrega: ese valor no entra en el pago de la página.",
+            "costo_envio_cop": "Solo si el envío se cobra aparte. En precio con envío o contraentrega déjalo en 0.",
         }
         widgets = {
             "descripcion": forms.Textarea(attrs={"rows": 6}),
@@ -246,6 +248,12 @@ class ProductoVendedorForm(forms.ModelForm):
             self.add_error("tiempo_entrega_max", "El máximo no puede ser menor que el mínimo.")
         if minimo is not None and minimo < 0:
             self.add_error("tiempo_entrega_min", "Los días de entrega no pueden ser negativos.")
+        modo = data.get("modo_envio") or "incluido"
+        costo_envio = data.get("costo_envio_cop") or 0
+        if modo == "aparte" and costo_envio <= 0:
+            self.add_error("costo_envio_cop", "Escribe cuánto cuesta el envío.")
+        elif modo != "aparte":
+            data["costo_envio_cop"] = 0
         if self.mayorista:
             precio = data.get("precio_mayor_cop")
             minimo_unidades = data.get("cantidad_minima")
@@ -265,6 +273,10 @@ class ProductoVendedorForm(forms.ModelForm):
         else:
             producto.controla_stock = True
             producto.stock = stock
+        producto.modo_envio = self.cleaned_data.get("modo_envio") or "incluido"
+        producto.envio_gratis = producto.modo_envio == "incluido"
+        if producto.modo_envio != "aparte":
+            producto.costo_envio_cop = 0
         if commit:
             producto.save()
             self.save_m2m()
@@ -279,8 +291,11 @@ class RegistroClienteForm(forms.Form):
     password = forms.CharField(label="Contraseña", min_length=8, widget=forms.PasswordInput)
     password2 = forms.CharField(label="Repite la contraseña", widget=forms.PasswordInput)
     telefono = forms.CharField(label="Teléfono", max_length=50)
+    direccion = forms.CharField(label="Dirección de entrega", widget=forms.Textarea(attrs={"rows": 2}))
+    barrio = forms.CharField(label="Barrio", max_length=120, required=False)
     ciudad = forms.CharField(label="Ciudad", max_length=100)
     departamento = forms.ChoiceField(label="Departamento", choices=DEPARTAMENTOS_CHOICES)
+    referencia = forms.CharField(label="Referencia o apartamento", max_length=200, required=False)
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -302,3 +317,73 @@ class RegistroClienteForm(forms.Form):
         if data.get("password") and data.get("password2") and data["password"] != data["password2"]:
             self.add_error("password2", "Las contraseñas no coinciden.")
         return data
+
+
+class RegistroCompradorForm(forms.Form):
+    nombre = forms.CharField(label="Nombre completo", max_length=200)
+    documento = forms.CharField(label="Cédula", max_length=40)
+    email = forms.EmailField(label="Correo")
+    password = forms.CharField(label="Contraseña", min_length=8, widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Repite la contraseña", widget=forms.PasswordInput)
+    telefono = forms.CharField(label="Teléfono", max_length=50)
+    direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
+    barrio = forms.CharField(label="Barrio", max_length=120, required=False)
+    ciudad = forms.CharField(label="Ciudad", max_length=100)
+    departamento = forms.ChoiceField(label="Departamento", choices=DEPARTAMENTOS_CHOICES)
+    referencia = forms.CharField(label="Apartamento, torre o referencia", max_length=200, required=False)
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        if User.objects.filter(username=email).exists():
+            raise forms.ValidationError("Ese correo ya está registrado.")
+        return email
+
+    def clean_telefono(self):
+        return _telefono_valido(self.cleaned_data["telefono"])
+
+    def clean_documento(self):
+        documento = "".join(ch for ch in self.cleaned_data["documento"] if ch.isdigit())
+        if len(documento) < 5:
+            raise forms.ValidationError("Escribe la cédula.")
+        return documento
+
+    def clean_departamento(self):
+        valor = self.cleaned_data["departamento"]
+        if not valor:
+            raise forms.ValidationError("Elige el departamento.")
+        return valor
+
+    def clean(self):
+        data = super().clean()
+        if data.get("password") and data.get("password2") and data["password"] != data["password2"]:
+            self.add_error("password2", "Las contraseñas no coinciden.")
+        return data
+
+
+class DatosCompradorForm(forms.ModelForm):
+    class Meta:
+        model = Comprador
+        fields = [
+            "nombre", "documento", "telefono", "direccion", "barrio",
+            "ciudad", "departamento", "referencia",
+        ]
+        labels = {
+            "nombre": "Nombre completo",
+            "documento": "Cédula",
+            "telefono": "Teléfono",
+            "direccion": "Dirección",
+            "barrio": "Barrio",
+            "ciudad": "Ciudad",
+            "departamento": "Departamento",
+            "referencia": "Apartamento, torre o referencia",
+        }
+        widgets = {"direccion": forms.Textarea(attrs={"rows": 2})}
+
+    def clean_telefono(self):
+        return _telefono_valido(self.cleaned_data["telefono"])
+
+    def clean_documento(self):
+        documento = "".join(ch for ch in self.cleaned_data["documento"] if ch.isdigit())
+        if len(documento) < 5:
+            raise forms.ValidationError("Escribe la cédula.")
+        return documento

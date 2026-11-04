@@ -11,4 +11,7 @@ urlpatterns = [
     path("proveedores/<slug:slug>/lista/", clientes.lista_mayorista, name="lista_mayorista"),
     path("mis-proveedores/", clientes.mis_proveedores, name="mis_proveedores"),
     path("historial/", clientes.historial_comprador, name="historial_comprador"),
+    path("cuenta/registro/", clientes.registro_comprador, name="registro_comprador"),
+    path("cuenta/entrar/", clientes.entrar_comprador, name="entrar_comprador"),
+    path("cuenta/", clientes.datos_comprador, name="datos_comprador"),
 ]

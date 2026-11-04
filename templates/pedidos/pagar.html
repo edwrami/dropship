@@ -6,6 +6,13 @@
 <h2>{{ pedido.producto.titulo }}</h2>
 <p class="price">${{ pedido.monto_cop|floatformat:0|intcomma }} COP{% if pedido.cantidad %} · {{ pedido.cantidad }} und.{% endif %}</p>
 <p>Referencia <strong>{{ pedido.referencia_pago }}</strong>.</p>
+{% if pedido.modo_envio == "contraentrega" %}
+  <p class="note">El envío se paga contraentrega. Este cobro es solo la mercancía.</p>
+{% elif pedido.modo_envio == "incluido" %}
+  <p class="note">El precio incluye el envío.</p>
+{% elif pedido.envio_cop %}
+  <p class="note">Este valor incluye el envío de ${{ pedido.envio_cop|floatformat:0|intcomma }}.</p>
+{% endif %}
 <p><a class="btn sec" href="{% url 'conversacion_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Hablar en el pedido</a></p>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 

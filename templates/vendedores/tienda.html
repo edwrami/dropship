@@ -42,7 +42,7 @@
         {% else %}
           <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
         {% endif %}
-        <p class="meta">{% if p.entrega_texto %}Entrega {{ p.entrega_texto }} · {% endif %}{{ p.visitas|intcomma }} visitas</p>
+        <p class="meta">{% if p.entrega_texto %}Entrega {{ p.entrega_texto }} · {% endif %}{% if p.modo_envio == "contraentrega" %}Envío contraentrega · {% elif p.modo_envio == "aparte" %}Envío ${{ p.costo_envio_cop|floatformat:0|intcomma }} · {% else %}Envío incluido · {% endif %}{{ p.visitas|intcomma }} visitas</p>
         <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir</a>
       </div>
     </article>

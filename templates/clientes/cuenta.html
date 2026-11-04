@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Mi cuenta · ERA shop{% endblock %}
+{% block content %}
+  <p class="kicker">{{ comprador.ciudad }}</p>
+  <h2>{{ comprador.nombre }}</h2>
+  <p class="muted">Estos datos se usan en cada pedido y quedan en ERA shop y en la tienda.</p>
+  <form method="post" style="max-width:720px">{% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn" type="submit">Guardar datos</button>
+  </form>
+  <h3>Historial de compras</h3>
+  {% include "clientes/_historial.html" %}
+{% endblock %}

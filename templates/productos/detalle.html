@@ -45,7 +45,11 @@
       {% if producto.color %}<li>Color: {{ producto.color }}</li>{% endif %}
       {% if producto.talla %}<li>Talla: {{ producto.talla }}</li>{% endif %}
       {% if producto.entrega_texto %}<li>Entrega: {{ producto.entrega_texto }}</li>{% endif %}
-      <li>{% if producto.envio_gratis %}Envío gratis{% else %}Envío ${{ producto.costo_envio_cop|floatformat:0|intcomma }}{% endif %}</li>
+      <li>
+        {% if producto.modo_envio == "contraentrega" %}Envío contraentrega
+        {% elif producto.modo_envio == "aparte" %}Envío ${{ producto.costo_envio_cop|floatformat:0|intcomma }}
+        {% else %}Envío incluido en el precio{% endif %}
+      </li>
       {% if producto.garantia_dias %}<li>Garantía: {{ producto.garantia_dias }} días</li>{% endif %}
       {% if producto.controla_stock %}<li>Disponibles: {{ producto.stock }}</li>{% endif %}
     </ul>
@@ -60,17 +64,35 @@
 
     <h3>Hacer pedido</h3>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    <form method="post" action="{% url 'crear_pedido' producto.pk %}">
-      {% csrf_token %}
-      <label>Cantidad<input name="cantidad" type="number" min="1" max="20" value="1"></label>
-      <label>Variante<input name="variante" placeholder="Talla, color u otra variante"></label>
-      <label>Tu nombre<input name="nombre" required></label>
-      <label>Tu teléfono<input name="telefono" required></label>
-      <label>Correo<input name="email" type="email"></label>
-      <label>Dirección de entrega<textarea name="direccion" required></textarea></label>
-      <label>Ciudad<input name="ciudad" required></label>
-      <button class="btn" type="submit">Hacer pedido y pagar</button>
-    </form>
+    {% if comprador_actual or cliente_actual.direccion %}
+      <div class="card">
+        {% if comprador_actual %}
+          <p><strong>{{ comprador_actual.nombre }}</strong> · cédula {{ comprador_actual.documento }}</p>
+          <p>{{ comprador_actual.direccion }}{% if comprador_actual.barrio %}, {{ comprador_actual.barrio }}{% endif %} · {{ comprador_actual.ciudad }}, {{ comprador_actual.departamento }}</p>
+          <p>{{ comprador_actual.telefono }} · {{ comprador_actual.user.email }}</p>
+          <p><a href="{% url 'datos_comprador' %}">Corregir mis datos</a></p>
+        {% else %}
+          <p><strong>{{ cliente_actual.responsable }}</strong> · {{ cliente_actual.nombre_tienda }}</p>
+          <p>{{ cliente_actual.direccion }}{% if cliente_actual.barrio %}, {{ cliente_actual.barrio }}{% endif %} · {{ cliente_actual.ciudad }}</p>
+          <p><a href="{% url 'mis_proveedores' %}">Corregir la dirección</a></p>
+        {% endif %}
+      </div>
+      <form method="post" action="{% url 'crear_pedido' producto.pk %}">
+        {% csrf_token %}
+        <label>Cantidad<input name="cantidad" type="number" min="1" max="{% if cliente_actual and producto.precio_mayor_cop %}999{% else %}20{% endif %}" value="1"></label>
+        <label>Variante<input name="variante" placeholder="Talla, color u otra variante"></label>
+        <button class="btn" type="submit">Hacer pedido y pagar</button>
+      </form>
+    {% elif cliente_actual %}
+      <p>Tu tienda ya está registrada. Completa la dirección de entrega antes de pedir.</p>
+      <p><a class="btn" href="{% url 'mis_proveedores' %}">Completar mis datos</a></p>
+    {% else %}
+      <p>Antes de pedir, regístrate con tu nombre, cédula, teléfono y dirección. Esos datos quedan guardados para ERA shop y para la tienda.</p>
+      <p>
+        <a class="btn" href="{% url 'registro_comprador' %}?next={{ request.path }}">Registrarme para pedir</a>
+        <a class="btn sec" href="{% url 'entrar_comprador' %}?next={{ request.path }}">Ya tengo cuenta</a>
+      </p>
+    {% endif %}
   </div>
 </article>
 {% endblock %}

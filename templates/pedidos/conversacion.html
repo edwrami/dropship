@@ -31,11 +31,20 @@
         </form>
       {% elif pedido.estado == "empacado" %}
         <form method="post">{% csrf_token %}
+          <label>Transportadora<input name="transportadora" required placeholder="Servientrega, Inter Rapidísimo, Mensajero"></label>
           <label>Número de guía<input name="guia" required></label>
-          <button class="btn" name="accion" value="enviado" type="submit">Marcar enviado</button>
+          <label>Fecha de despacho<input name="fecha_despacho" type="date" required></label>
+          <label>Quién recibe<input name="recibe_nombre" value="{{ pedido.cliente_nombre }}" required></label>
+          <label>Cédula de quien recibe<input name="recibe_documento" value="{{ pedido.cliente_documento }}" required></label>
+          <label>Teléfono de quien recibe<input name="recibe_telefono" value="{{ pedido.cliente_telefono }}" required></label>
+          <label>Detalle del envío<input name="detalle_envio" placeholder="Observación, horario, punto de entrega"></label>
+          <button class="btn" name="accion" value="enviado" type="submit">Marcar despachado</button>
         </form>
       {% elif pedido.estado == "enviado" %}
         <form method="post">{% csrf_token %}
+          <label>Quién recibió<input name="entrega_recibio" value="{{ pedido.recibe_nombre }}" required></label>
+          <label>Cédula de quien recibió<input name="entrega_documento" value="{{ pedido.recibe_documento }}" required></label>
+          <label>Nota de la entrega<input name="entrega_nota" placeholder="Opcional"></label>
           <button class="btn" name="accion" value="entregado" type="submit">Marcar entregado</button>
         </form>
       {% else %}
@@ -86,15 +95,31 @@
     </form>
   {% endif %}
 
-  {% if rol == "vendedor" or rol == "plataforma" %}
-    <div class="card">
-      <p><strong>Entrega</strong></p>
-      <p>{{ pedido.cliente_nombre }} · {{ pedido.cliente_telefono }}</p>
-      <p>{{ pedido.cliente_direccion }} · {{ pedido.cliente_ciudad }}</p>
-      {% if pedido.cliente_email %}<p>{{ pedido.cliente_email }}</p>{% endif %}
-      {% if pedido.variante %}<p>Variante: {{ pedido.variante }}</p>{% endif %}
-    </div>
-  {% endif %}
+  <div class="card">
+    <p><strong>Datos del cliente</strong></p>
+    <p>{{ pedido.cliente_nombre }}{% if pedido.cliente_documento %} · cédula {{ pedido.cliente_documento }}{% endif %}</p>
+    <p>{{ pedido.cliente_telefono }}{% if pedido.cliente_email %} · {{ pedido.cliente_email }}{% endif %}</p>
+    <p>{{ pedido.cliente_direccion }}{% if pedido.cliente_barrio %}, {{ pedido.cliente_barrio }}{% endif %}</p>
+    <p>{{ pedido.cliente_ciudad }}{% if pedido.cliente_departamento %}, {{ pedido.cliente_departamento }}{% endif %}</p>
+    {% if pedido.cliente_referencia %}<p>Referencia: {{ pedido.cliente_referencia }}</p>{% endif %}
+    {% if pedido.variante %}<p>Variante: {{ pedido.variante }}</p>{% endif %}
+    {% if pedido.modo_envio == "contraentrega" %}
+      <p>El envío se paga contraentrega. No entra en el pago de la página.</p>
+    {% elif pedido.modo_envio == "aparte" %}
+      <p>Envío cobrado en el pedido: ${{ pedido.envio_cop|floatformat:0|intcomma }}.</p>
+    {% elif pedido.modo_envio == "incluido" %}
+      <p>El precio incluye el envío.</p>
+    {% endif %}
+    {% if pedido.transportadora %}
+      <p>Despacho: {{ pedido.transportadora }} · guía {{ pedido.tracking }}{% if pedido.fecha_despacho %} · {{ pedido.fecha_despacho|date:"d/m/Y" }}{% endif %}</p>
+      <p>Recibe: {{ pedido.recibe_nombre }} · cédula {{ pedido.recibe_documento }} · {{ pedido.recibe_telefono }}</p>
+      {% if pedido.detalle_envio %}<p>{{ pedido.detalle_envio }}</p>{% endif %}
+    {% endif %}
+    {% if pedido.estado == "entregado" %}
+      <p>Entregado {{ pedido.entregado_en|date:"d/m/Y H:i" }} a {{ pedido.entrega_recibio }}{% if pedido.entrega_documento %}, cédula {{ pedido.entrega_documento }}{% endif %}.</p>
+      {% if pedido.entrega_nota %}<p>{{ pedido.entrega_nota }}</p>{% endif %}
+    {% endif %}
+  </div>
 
   <div class="hilo">
     {% for m in mensajes %}

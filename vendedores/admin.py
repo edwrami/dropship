@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Categoria, ClienteTienda, Conexion, Vendedor
+from .models import Categoria, ClienteTienda, Comprador, Conexion, Vendedor
 from .services import expulsar_vendedor
 
 
@@ -43,6 +43,12 @@ class VendedorAdmin(admin.ModelAdmin):
 class ClienteTiendaAdmin(admin.ModelAdmin):
     list_display = ("nombre_tienda", "ciudad", "departamento", "responsable", "creado")
     search_fields = ("nombre_tienda", "ciudad", "responsable", "user__email")
+
+
+@admin.register(Comprador)
+class CompradorAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "documento", "telefono", "ciudad", "departamento", "creado")
+    search_fields = ("nombre", "documento", "telefono", "ciudad", "user__email")
 
 
 @admin.register(Conexion)

@@ -46,6 +46,12 @@ class Producto(models.Model):
     )
     tiempo_entrega_min = models.PositiveSmallIntegerField(null=True, blank=True)
     tiempo_entrega_max = models.PositiveSmallIntegerField(null=True, blank=True)
+    MODOS_ENVIO = [
+        ("incluido", "El precio incluye el envío"),
+        ("aparte", "El envío se cobra aparte"),
+        ("contraentrega", "El envío se paga contraentrega"),
+    ]
+    modo_envio = models.CharField(max_length=20, choices=MODOS_ENVIO, default="incluido")
     envio_gratis = models.BooleanField(default=False)
     costo_envio_cop = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     garantia_dias = models.PositiveIntegerField(default=0)

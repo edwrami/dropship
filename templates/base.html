@@ -34,7 +34,12 @@
         {% elif cliente_actual %}
           <a href="{% url 'mis_proveedores' %}">Mis proveedores</a>
           <a href="{% url 'salir_vendedor' %}">Salir</a>
+        {% elif comprador_actual %}
+          <a href="{% url 'datos_comprador' %}">Mi cuenta</a>
+          <a href="{% url 'historial_comprador' %}">Mis pedidos</a>
+          <a href="{% url 'salir_vendedor' %}">Salir</a>
         {% else %}
+          <a href="{% url 'registro_comprador' %}">Registrarme</a>
           <a href="{% url 'historial_comprador' %}">Mis pedidos</a>
           <a href="{% url 'registro_cliente' %}">Soy tienda</a>
           <a class="solid" href="{% url 'registro_vendedor' %}">Vender</a>

@@ -124,6 +124,14 @@ def panel(request):
     deuda = pedidos.filter(estado_comision__in=["pendiente", "reportada"]).aggregate(
         s=Sum("comision_cop")
     )["s"] or 0
+    clientes = []
+    vistos = set()
+    for pedido in pedidos:
+        clave = (pedido.cliente_documento or pedido.cliente_telefono, pedido.cliente_nombre)
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        clientes.append(pedido)
     notas = vendedor.calificaciones.aggregate(promedio=Avg("estrellas"), total=Count("id"))
     nota_publica = vendedor.calificacion_manual if vendedor.calificacion_manual is not None else notas["promedio"]
     return render(request, "vendedores/panel.html", {
@@ -132,6 +140,7 @@ def panel(request):
         "pedidos": pedidos,
         "deuda": deuda,
         "conexiones": conexiones,
+        "clientes": clientes,
         "nota_publica": nota_publica,
         "total_notas": notas["total"],
         "comentarios": vendedor.calificaciones.select_related("pedido").order_by("-creado")[:20],

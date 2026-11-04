@@ -113,7 +113,7 @@
         <p class="meta">
           {% if p.ciudad_despacho %}{{ p.ciudad_despacho }}{% endif %}
           {% if p.entrega_texto %} · {{ p.entrega_texto }}{% endif %}
-          {% if p.envio_gratis %} · Envío gratis{% endif %}
+          {% if p.modo_envio == "contraentrega" %} · Envío contraentrega{% elif p.modo_envio == "aparte" %} · Envío ${{ p.costo_envio_cop|floatformat:0|intcomma }}{% else %} · Envío incluido{% endif %}
           {% if p.vendedor %}<br>{{ p.vendedor.nombre_tienda }}{% endif %}
           <br>{{ p.visitas|intcomma }} visitas
         </p>

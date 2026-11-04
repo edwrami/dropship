@@ -100,8 +100,11 @@ class ClienteTienda(models.Model):
     responsable = models.CharField(max_length=200)
     documento = models.CharField(max_length=40)
     telefono = models.CharField(max_length=50)
+    direccion = models.TextField(blank=True)
+    barrio = models.CharField(max_length=120, blank=True)
     ciudad = models.CharField(max_length=100, db_index=True)
     departamento = models.CharField(max_length=60, choices=DEPARTAMENTOS_CHOICES, db_index=True)
+    referencia = models.CharField(max_length=200, blank=True)
     creado = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -111,6 +114,29 @@ class ClienteTienda(models.Model):
 
     def __str__(self):
         return f"{self.nombre_tienda} · {self.ciudad}"
+
+
+class Comprador(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="comprador",
+    )
+    nombre = models.CharField(max_length=200)
+    documento = models.CharField(max_length=40)
+    telefono = models.CharField(max_length=50)
+    direccion = models.TextField()
+    barrio = models.CharField(max_length=120, blank=True)
+    ciudad = models.CharField(max_length=100)
+    departamento = models.CharField(max_length=60, choices=DEPARTAMENTOS_CHOICES)
+    referencia = models.CharField(max_length=200, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        verbose_name = "comprador"
+        verbose_name_plural = "compradores"
+
+    def __str__(self):
+        return f"{self.nombre} · {self.ciudad}"
 
 
 class Conexion(models.Model):

@@ -9,8 +9,8 @@ from django.views.decorators.http import require_POST
 
 from pedidos.models import Pedido
 
-from .forms import RegistroClienteForm
-from .models import ClienteTienda, Conexion, Vendedor
+from .forms import DatosCompradorForm, RegistroClienteForm, RegistroCompradorForm
+from .models import ClienteTienda, Comprador, Conexion, Vendedor
 from .opciones import DEPARTAMENTOS, TIPOS_PROVEEDOR
 
 
@@ -21,6 +21,22 @@ def _cliente(user):
         return user.cliente_tienda
     except ClienteTienda.DoesNotExist:
         return None
+
+
+def _comprador(user):
+    if not getattr(user, "is_authenticated", False):
+        return None
+    try:
+        return user.comprador
+    except Comprador.DoesNotExist:
+        return None
+
+
+def _siguiente(request, por_defecto):
+    destino = (request.POST.get("next") or request.GET.get("next") or "").strip()
+    if destino.startswith("/") and not destino.startswith("//"):
+        return destino
+    return por_defecto
 
 
 def _proveedores():
@@ -49,8 +65,11 @@ def registro_cliente(request):
             responsable=data["responsable"].strip(),
             documento=data["documento"].strip(),
             telefono=data["telefono"],
+            direccion=data["direccion"].strip(),
+            barrio=(data.get("barrio") or "").strip(),
             ciudad=data["ciudad"].strip(),
             departamento=data["departamento"],
+            referencia=(data.get("referencia") or "").strip(),
         )
         login(request, user)
         messages.success(request, "Tienda registrada. Ya puedes conectarte con mayoristas e importadores.")
@@ -155,14 +174,14 @@ def lista_mayorista(request, slug):
     })
 
 
-def pedidos_del_comprador(request, cliente):
+def pedidos_del_comprador(request, cliente=None, comprador=None):
     ids = []
     for valor in request.session.get("pedidos_contacto") or []:
         try:
             ids.append(int(valor))
         except (TypeError, ValueError):
             continue
-    if cliente is None and not ids:
+    if cliente is None and comprador is None and not ids:
         return Pedido.objects.none()
     consulta = Q(pk__in=ids) if ids else Q(pk__isnull=True)
     if cliente is not None:
@@ -170,15 +189,92 @@ def pedidos_del_comprador(request, cliente):
         email = (cliente.user.email or "").strip()
         if email:
             consulta |= Q(cliente_email__iexact=email)
+    if comprador is not None:
+        consulta |= Q(comprador=comprador)
+        email = (comprador.user.email or "").strip()
+        if email:
+            consulta |= Q(cliente_email__iexact=email)
     return Pedido.objects.filter(consulta).select_related("producto", "vendedor")
 
 
 def historial_comprador(request):
     cliente = _cliente(request.user)
-    if cliente is not None:
+    comprador = _comprador(request.user)
+    if cliente is not None and comprador is None:
         return redirect("mis_proveedores")
     return render(request, "clientes/historial.html", {
-        "pedidos": pedidos_del_comprador(request, None),
+        "pedidos": pedidos_del_comprador(request, cliente, comprador),
+        "comprador": comprador,
+    })
+
+
+def registro_comprador(request):
+    if _comprador(request.user):
+        return redirect(_siguiente(request, "/clientes/cuenta/"))
+    form = RegistroCompradorForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        user = User.objects.create_user(
+            username=data["email"],
+            email=data["email"],
+            password=data["password"],
+        )
+        Comprador.objects.create(
+            user=user,
+            nombre=data["nombre"].strip(),
+            documento=data["documento"],
+            telefono=data["telefono"],
+            direccion=data["direccion"].strip(),
+            barrio=(data.get("barrio") or "").strip(),
+            ciudad=data["ciudad"].strip(),
+            departamento=data["departamento"],
+            referencia=(data.get("referencia") or "").strip(),
+        )
+        login(request, user)
+        messages.success(request, "Registro guardado. Ya puedes hacer el pedido.")
+        return redirect(_siguiente(request, "/clientes/cuenta/"))
+    return render(request, "clientes/registro_comprador.html", {
+        "form": form,
+        "next": request.GET.get("next", ""),
+    })
+
+
+def entrar_comprador(request):
+    if _comprador(request.user):
+        return redirect(_siguiente(request, "/clientes/cuenta/"))
+    error = ""
+    if request.method == "POST":
+        email = (request.POST.get("email") or "").strip().lower()
+        user = authenticate(request, username=email, password=request.POST.get("password") or "")
+        if user is None:
+            error = "Correo o contraseña incorrectos."
+        else:
+            login(request, user)
+            if _comprador(user) is None:
+                logout(request)
+                error = "Esa cuenta no es de comprador. Una tienda entra por Soy tienda y un vendedor por Vender."
+            else:
+                return redirect(_siguiente(request, "/clientes/cuenta/"))
+    return render(request, "clientes/entrar_comprador.html", {
+        "error": error,
+        "next": request.POST.get("next") or request.GET.get("next", ""),
+    })
+
+
+@login_required(login_url="entrar_comprador")
+def datos_comprador(request):
+    comprador = _comprador(request.user)
+    if comprador is None:
+        return redirect("registro_comprador")
+    form = DatosCompradorForm(request.POST or None, instance=comprador)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Datos actualizados.")
+        return redirect("datos_comprador")
+    return render(request, "clientes/cuenta.html", {
+        "form": form,
+        "comprador": comprador,
+        "pedidos": pedidos_del_comprador(request, None, comprador),
     })
 
 
@@ -187,6 +283,16 @@ def mis_proveedores(request):
     cliente = _cliente(request.user)
     if cliente is None:
         return redirect("registro_cliente")
+    if request.method == "POST":
+        cliente.direccion = (request.POST.get("direccion") or "").strip()
+        cliente.barrio = (request.POST.get("barrio") or "").strip()[:120]
+        cliente.referencia = (request.POST.get("referencia") or "").strip()[:200]
+        if not cliente.direccion:
+            messages.error(request, "Escribe la dirección de entrega.")
+        else:
+            cliente.save(update_fields=["direccion", "barrio", "referencia"])
+            messages.success(request, "Dirección guardada.")
+        return redirect("mis_proveedores")
     conexiones = cliente.conexiones.select_related("proveedor").order_by("proveedor__nombre_tienda")
     return render(request, "clientes/mios.html", {
         "cliente": cliente,

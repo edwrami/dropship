@@ -45,6 +45,49 @@ def lista_pedidos(request):
     return _registro_ventas(request)
 
 
+def _perfil_comprador(request):
+    if not request.user.is_authenticated:
+        return None
+    from vendedores.models import ClienteTienda, Comprador
+    try:
+        persona = request.user.comprador
+    except Comprador.DoesNotExist:
+        persona = None
+    if persona is not None:
+        return {
+            "comprador": persona,
+            "cliente_tienda": None,
+            "nombre": persona.nombre,
+            "documento": persona.documento,
+            "telefono": persona.telefono,
+            "email": request.user.email,
+            "direccion": persona.direccion,
+            "barrio": persona.barrio,
+            "ciudad": persona.ciudad,
+            "departamento": persona.departamento,
+            "referencia": persona.referencia,
+        }
+    try:
+        tienda = request.user.cliente_tienda
+    except ClienteTienda.DoesNotExist:
+        tienda = None
+    if tienda is None or not (tienda.direccion or "").strip():
+        return None
+    return {
+        "comprador": None,
+        "cliente_tienda": tienda,
+        "nombre": tienda.responsable,
+        "documento": tienda.documento,
+        "telefono": tienda.telefono,
+        "email": request.user.email,
+        "direccion": tienda.direccion,
+        "barrio": tienda.barrio,
+        "ciudad": tienda.ciudad,
+        "departamento": tienda.departamento,
+        "referencia": tienda.referencia,
+    }
+
+
 def _marcar_contacto(request, pedido):
     ids = request.session.get("pedidos_contacto", [])
     if pedido.id not in ids:
@@ -75,10 +118,7 @@ def crear_pedido(request, producto_id):
     if cantidad > 999:
         cantidad = 999
 
-    nombre = (request.POST.get("nombre") or "").strip()
-    telefono = (request.POST.get("telefono") or "").strip()
-    direccion = (request.POST.get("direccion") or "").strip()
-    ciudad = (request.POST.get("ciudad") or "").strip()
+    perfil = _perfil_comprador(request)
 
     with transaction.atomic():
         producto = get_object_or_404(
@@ -92,8 +132,8 @@ def crear_pedido(request, producto_id):
         def _error(msg):
             return render(request, "productos/detalle.html", {"producto": producto, "error": msg})
 
-        if not all([nombre, telefono, direccion, ciudad]):
-            return _error("Completa nombre, teléfono, dirección y ciudad.")
+        if perfil is None:
+            return _error("Regístrate con tus datos antes de pedir.")
         if producto.controla_stock and producto.stock < cantidad:
             return _error("No hay suficientes unidades.")
 
@@ -116,31 +156,32 @@ def crear_pedido(request, producto_id):
         elif cantidad > 20:
             cantidad = 20
             precio = Decimal(producto.precio_vigente)
+        modo = producto.modo_envio or ("incluido" if producto.envio_gratis else "aparte")
         envio = Decimal("0")
-        if not producto.envio_gratis:
+        if modo == "aparte":
             envio = Decimal(producto.costo_envio_cop or 0)
         subtotal = (precio * cantidad + envio).quantize(
             Decimal("1"), rounding=ROUND_HALF_UP,
         )
         vendedor = producto.vendedor
-        cliente_tienda = None
-        if request.user.is_authenticated:
-            from vendedores.models import ClienteTienda
-            try:
-                cliente_tienda = request.user.cliente_tienda
-            except ClienteTienda.DoesNotExist:
-                cliente_tienda = None
         pedido = Pedido.objects.create(
             producto=producto,
             vendedor=vendedor,
-            cliente_tienda=cliente_tienda,
+            cliente_tienda=perfil.get("cliente_tienda"),
+            comprador=perfil.get("comprador"),
             variante=request.POST.get("variante", ""),
             cantidad=cantidad,
-            cliente_nombre=nombre,
-            cliente_telefono=telefono,
-            cliente_email=(request.POST.get("email") or "").strip(),
-            cliente_direccion=direccion,
-            cliente_ciudad=ciudad,
+            cliente_nombre=perfil["nombre"],
+            cliente_telefono=perfil["telefono"],
+            cliente_email=perfil["email"],
+            cliente_direccion=perfil["direccion"],
+            cliente_barrio=perfil["barrio"],
+            cliente_ciudad=perfil["ciudad"],
+            cliente_departamento=perfil["departamento"],
+            cliente_documento=perfil["documento"],
+            cliente_referencia=perfil["referencia"],
+            modo_envio=modo,
+            envio_cop=envio,
             monto_cop=subtotal,
             estado="pendiente",
             estado_pago="pendiente",
@@ -419,6 +460,35 @@ def _publicar_mensaje(request, pedido, rol):
     avisar_mensaje(pedido, rol, cliente, tienda)
 
 
+def _datos_despacho(request, pedido):
+    from datetime import datetime
+    transportadora = (request.POST.get("transportadora") or "").strip()[:120]
+    guia = (request.POST.get("guia") or "").strip()[:200]
+    recibe = (request.POST.get("recibe_nombre") or pedido.cliente_nombre).strip()[:200]
+    documento = "".join(ch for ch in (request.POST.get("recibe_documento") or "") if ch.isdigit())[:40]
+    telefono = (request.POST.get("recibe_telefono") or "").strip()[:50]
+    detalle = (request.POST.get("detalle_envio") or "").strip()[:300]
+    try:
+        fecha = datetime.strptime((request.POST.get("fecha_despacho") or "").strip(), "%Y-%m-%d").date()
+    except ValueError:
+        fecha = None
+    if not all([transportadora, guia, recibe, telefono]) or len(documento) < 5 or fecha is None:
+        messages.error(
+            request,
+            "Para despachar escribe transportadora, guía, fecha, quién recibe, cédula y teléfono.",
+        )
+        return None
+    return {
+        "transportadora": transportadora,
+        "guia": guia,
+        "recibe": recibe,
+        "documento": documento,
+        "telefono": telefono,
+        "detalle": detalle,
+        "fecha": fecha,
+    }
+
+
 def _marcar_estado(request, pedido, rol, accion):
     if rol not in ("vendedor", "plataforma"):
         messages.error(request, "Solo la tienda actualiza el estado del pedido.")
@@ -435,19 +505,50 @@ def _marcar_estado(request, pedido, rol, accion):
         pedido.save(update_fields=["estado"])
         nota = "La tienda empacó el pedido."
     elif accion == "enviado" and paso == 2:
-        guia = (request.POST.get("guia") or "").strip()[:200]
-        if not guia:
-            messages.error(request, "Escribe el número de guía para marcarlo enviado.")
+        datos = _datos_despacho(request, pedido)
+        if datos is None:
             return
         pedido.estado = "enviado"
-        pedido.tracking = guia
-        pedido.save(update_fields=["estado", "tracking"])
-        nota = f"La tienda envió el pedido. Guía {guia}."
+        pedido.tracking = datos["guia"]
+        pedido.transportadora = datos["transportadora"]
+        pedido.fecha_despacho = datos["fecha"]
+        pedido.recibe_nombre = datos["recibe"]
+        pedido.recibe_documento = datos["documento"]
+        pedido.recibe_telefono = datos["telefono"]
+        pedido.detalle_envio = datos["detalle"]
+        pedido.save(update_fields=[
+            "estado", "tracking", "transportadora", "fecha_despacho",
+            "recibe_nombre", "recibe_documento", "recibe_telefono", "detalle_envio",
+        ])
+        nota = (
+            f"Despachado el {datos['fecha']:%d/%m/%Y} por {datos['transportadora']}. "
+            f"Guía {datos['guia']}. Recibe {datos['recibe']}, cédula {datos['documento']}, "
+            f"teléfono {datos['telefono']}."
+        )
+        if datos["detalle"]:
+            nota += f" {datos['detalle']}"
     elif accion == "entregado" and paso == 3:
+        recibio = (request.POST.get("entrega_recibio") or "").strip()[:200]
+        documento = "".join(ch for ch in (request.POST.get("entrega_documento") or "") if ch.isdigit())[:40]
+        nota_entrega = (request.POST.get("entrega_nota") or "").strip()[:300]
+        if not recibio or len(documento) < 5:
+            messages.error(request, "Escribe quién recibió el pedido y su cédula.")
+            return
         pedido.estado = "entregado"
         pedido.entregado_en = timezone.now()
-        pedido.save(update_fields=["estado", "entregado_en"])
-        nota = "La tienda marcó el pedido como entregado. Tienes 5 días para una devolución y para calificar."
+        pedido.entrega_recibio = recibio
+        pedido.entrega_documento = documento
+        pedido.entrega_nota = nota_entrega
+        pedido.save(update_fields=[
+            "estado", "entregado_en", "entrega_recibio", "entrega_documento", "entrega_nota",
+        ])
+        nota = (
+            f"Entregado el {timezone.localtime(pedido.entregado_en):%d/%m/%Y %H:%M} "
+            f"a {recibio}, cédula {documento}."
+        )
+        if nota_entrega:
+            nota += f" {nota_entrega}"
+        nota += " Tienes 5 días para una devolución y para calificar."
     else:
         messages.error(request, "Ese paso no corresponde al estado actual del pedido.")
         return
@@ -629,6 +730,9 @@ def _registro_ventas(request):
             | Q(cliente_email__icontains=q)
             | Q(cliente_ciudad__icontains=q)
             | Q(cliente_direccion__icontains=q)
+            | Q(cliente_documento__icontains=q)
+            | Q(transportadora__icontains=q)
+            | Q(tracking__icontains=q)
             | Q(referencia_pago__icontains=q)
             | Q(producto__titulo__icontains=q)
             | Q(vendedor__nombre_tienda__icontains=q)
