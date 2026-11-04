@@ -10,13 +10,18 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from pedidos.models import LineaPedido, MensajePedido, Pedido
+from django.http import Http404
+
+from pedidos.models import Compra, LineaPedido, MensajePedido, Pedido
 from productos.models import Producto
 
 from .forms import DatosClienteForm, DatosCompradorForm, RegistroClienteForm, RegistroCompradorForm
-from .models import Carrito, CarritoLinea, ClienteTienda, Comprador, Conexion, Vendedor
+from .models import (
+    Carrito, CarritoComprador, CarritoCompradorLinea, CarritoLinea,
+    ClienteTienda, Comprador, Conexion, Vendedor,
+)
 from .opciones import DEPARTAMENTOS, TIPOS_PROVEEDOR
-from .services import aplicar_comision, iva_mercancia, peso
+from .services import aplicar_comision, cargos_mostrador_grupo, iva_mercancia, peso
 
 
 def _cliente(user):
@@ -607,11 +612,15 @@ def datos_comprador(request):
         form.save()
         messages.success(request, "Datos actualizados.")
         return redirect("datos_comprador")
-    return render(request, "clientes/cuenta.html", {
+    from productos.views import vitrina_comprador
+
+    ctx = vitrina_comprador(request)
+    ctx.update({
         "form": form,
         "comprador": comprador,
         "pedidos": pedidos_del_comprador(request, None, comprador),
     })
+    return render(request, "clientes/cuenta.html", ctx)
 
 
 @login_required(login_url="entrar_cliente")
@@ -646,4 +655,326 @@ def mis_proveedores(request):
         "conexiones": conexiones,
         "pedidos": pedidos_del_comprador(request, cliente),
         "abiertos": abiertos,
+    })
+
+
+def _carrito_de(comprador):
+    carrito, _creado = CarritoComprador.objects.get_or_create(comprador=comprador)
+    return carrito
+
+
+def _preparar_linea(producto, cantidad):
+    precio = Decimal(producto.precio_vigente)
+    modo = producto.modo_envio or ("incluido" if producto.envio_gratis else "aparte")
+    envio = Decimal(producto.costo_envio_cop or 0) if modo == "aparte" else Decimal("0")
+    return {
+        "producto": producto,
+        "cantidad": cantidad,
+        "precio": precio,
+        "modo": modo,
+        "envio": envio,
+        "subtotal": peso(precio * cantidad + envio),
+    }
+
+
+def _grupos_carrito(lineas):
+    grupos = []
+    indice = {}
+    total = Decimal("0")
+    for linea in lineas:
+        producto = linea.producto
+        if not producto.activo or (producto.vendedor_id and producto.vendedor.estado != "activo"):
+            continue
+        item = _preparar_linea(producto, linea.cantidad)
+        item["linea"] = linea
+        clave = producto.vendedor_id or 0
+        if clave not in indice:
+            indice[clave] = {
+                "tienda": producto.vendedor,
+                "items": [],
+                "suma": Decimal("0"),
+            }
+            grupos.append(indice[clave])
+        indice[clave]["items"].append(item)
+        indice[clave]["suma"] += item["subtotal"]
+        total += item["subtotal"]
+    for grupo in grupos:
+        grupo["suma"] = peso(grupo["suma"])
+    return grupos, peso(total)
+
+
+@require_POST
+def agregar_compra(request):
+    try:
+        producto_id = int(request.POST.get("producto") or 0)
+    except (TypeError, ValueError):
+        producto_id = 0
+    producto = (
+        Producto.objects.filter(pk=producto_id, activo=True)
+        .select_related("vendedor")
+        .first()
+    )
+    if producto is None or (producto.vendedor_id and producto.vendedor.estado != "activo"):
+        messages.error(request, "Ese producto ya no está disponible.")
+        return redirect("lista_productos")
+    comprador = _comprador(request.user)
+    if comprador is None:
+        return redirect(f"/clientes/cuenta/registro/?next=/producto/{producto.pk}/")
+    try:
+        cantidad = int(request.POST.get("cantidad") or 1)
+    except (TypeError, ValueError):
+        cantidad = 1
+    cantidad = max(1, min(cantidad, 20))
+    carrito = _carrito_de(comprador)
+    linea, creada = CarritoCompradorLinea.objects.get_or_create(
+        carrito=carrito, producto=producto, defaults={"cantidad": cantidad},
+    )
+    if not creada:
+        linea.cantidad = min(20, linea.cantidad + cantidad)
+        linea.save(update_fields=["cantidad"])
+    messages.success(request, "Quedó en el carrito. Puedes sumar más productos de esta tienda o de otras.")
+    return redirect("carrito_compra")
+
+
+@login_required(login_url="entrar_comprador")
+def carrito_compra(request):
+    comprador = _comprador(request.user)
+    if comprador is None:
+        return redirect("registro_comprador")
+    carrito = _carrito_de(comprador)
+    retirados = carrito.lineas.exclude(producto__activo=True).count()
+    retirados += carrito.lineas.filter(producto__vendedor__estado="expulsado").count()
+    if retirados:
+        carrito.lineas.exclude(producto__activo=True).delete()
+        carrito.lineas.filter(producto__vendedor__estado="expulsado").delete()
+        messages.error(request, "Se quitaron productos que ya no están disponibles.")
+    if request.method == "POST":
+        accion = request.POST.get("accion") or ""
+        if accion.startswith("quitar-"):
+            try:
+                linea_id = int(accion.split("-", 1)[1])
+            except (TypeError, ValueError):
+                linea_id = 0
+            carrito.lineas.filter(pk=linea_id).delete()
+            return redirect("carrito_compra")
+        for linea in carrito.lineas.all():
+            try:
+                cantidad = int(request.POST.get(f"cantidad-{linea.id}") or linea.cantidad)
+            except (TypeError, ValueError):
+                cantidad = linea.cantidad
+            linea.cantidad = max(1, min(cantidad, 20))
+            linea.save(update_fields=["cantidad"])
+        if accion == "pagar":
+            compra, error = _cerrar_carrito(comprador, carrito)
+            if error:
+                messages.error(request, error)
+                return redirect("carrito_compra")
+            _avisar_compra(request, compra)
+            return redirect(f"/clientes/carrito/pagar/{compra.id}/?clave={compra.clave_contacto}")
+        messages.success(request, "Carrito actualizado.")
+        return redirect("carrito_compra")
+    lineas = list(
+        carrito.lineas.select_related("producto__vendedor").order_by("producto__vendedor_id", "id")
+    )
+    grupos, total = _grupos_carrito(lineas)
+    return render(request, "clientes/carrito_compra.html", {
+        "grupos": grupos,
+        "total": total,
+        "comprador": comprador,
+    })
+
+
+def _cerrar_carrito(comprador, carrito):
+    with transaction.atomic():
+        carrito = CarritoComprador.objects.select_for_update().get(pk=carrito.pk)
+        lineas = list(
+            carrito.lineas.select_related("producto__vendedor__user").order_by("id")
+        )
+        if not lineas:
+            return None, "El carrito está vacío."
+        ids = sorted({linea.producto_id for linea in lineas})
+        bloqueados = {
+            producto.id: producto
+            for producto in Producto.objects.select_for_update().filter(pk__in=ids).order_by("id")
+        }
+        grupos = {}
+        orden = []
+        for linea in lineas:
+            producto = bloqueados.get(linea.producto_id)
+            vendedor = linea.producto.vendedor
+            if producto is None or not producto.activo or (vendedor and vendedor.estado != "activo"):
+                return None, "Hay un producto que ya no está disponible. Quítalo del carrito."
+            cantidad = max(1, min(linea.cantidad, 20))
+            if producto.controla_stock and producto.stock < cantidad:
+                return None, f"No hay suficientes unidades de {producto.titulo}."
+            clave = vendedor.id if vendedor else 0
+            if clave not in grupos:
+                grupos[clave] = []
+                orden.append(clave)
+            item = _preparar_linea(producto, cantidad)
+            item["vendedor"] = vendedor
+            grupos[clave].append(item)
+        compra = Compra.objects.create(
+            comprador=comprador,
+            referencia_pago=uuid.uuid4().hex,
+            cliente_email=(comprador.user.email or "")[:254],
+            clave_contacto=uuid.uuid4().hex,
+            estado_pago="pendiente",
+        )
+        pedidos = []
+        for clave in orden:
+            items = grupos[clave]
+            primero = items[0]["producto"]
+            vendedor = items[0]["vendedor"]
+            monto = peso(sum((item["subtotal"] for item in items), Decimal("0")))
+            envio = peso(sum((item["envio"] for item in items), Decimal("0")))
+            modos = {item["modo"] for item in items}
+            pedido = Pedido.objects.create(
+                producto=primero,
+                vendedor=vendedor,
+                comprador=comprador,
+                compra=compra,
+                cantidad=sum(item["cantidad"] for item in items),
+                cliente_nombre=comprador.nombre,
+                cliente_telefono=comprador.telefono,
+                cliente_email=comprador.user.email or "",
+                cliente_direccion=comprador.direccion,
+                cliente_barrio=comprador.barrio,
+                cliente_ciudad=comprador.ciudad,
+                cliente_departamento=comprador.departamento,
+                cliente_documento=comprador.documento,
+                cliente_referencia=comprador.referencia,
+                modo_envio=items[0]["modo"] if len(modos) == 1 else "",
+                envio_cop=envio,
+                monto_cop=monto,
+                subtotal_cop=monto,
+                es_mayor=False,
+                estado="pendiente",
+                estado_pago="pendiente",
+                referencia_pago=uuid.uuid4().hex,
+                contacto_responsable=vendedor.responsable if vendedor else "",
+                contacto_telefono=vendedor.telefono if vendedor else "",
+                contacto_whatsapp=vendedor.whatsapp if vendedor else "",
+                contacto_email=vendedor.user.email if vendedor else "",
+                contacto_direccion=vendedor.direccion if vendedor else "",
+                contacto_nequi=vendedor.nequi if vendedor else "",
+                clave_contacto=uuid.uuid4().hex,
+            )
+            pedido.referencia_pago = f"PED-{pedido.id}"
+            if len(items) > 1:
+                for item in items:
+                    LineaPedido.objects.create(
+                        pedido=pedido,
+                        producto=item["producto"],
+                        titulo=item["producto"].titulo[:300],
+                        cantidad=item["cantidad"],
+                        precio_unitario=item["precio"],
+                        modo_envio=item["modo"],
+                        envio_cop=item["envio"],
+                        subtotal_cop=item["subtotal"],
+                    )
+            pedidos.append(pedido)
+            for item in items:
+                producto = item["producto"]
+                if producto.controla_stock:
+                    producto.stock -= item["cantidad"]
+                    producto.save(update_fields=["stock"])
+        cargos_mostrador_grupo(pedidos)
+        for pedido in pedidos:
+            pedido.save()
+            MensajePedido.objects.create(
+                pedido=pedido,
+                autor="plataforma",
+                nombre="ERA shop",
+                texto=(
+                    "Pedido creado desde el carrito. El teléfono, WhatsApp, correo y dirección "
+                    "del vendedor aparecen cuando la transferencia quede aprobada."
+                ),
+            )
+        compra.referencia_pago = f"COM-{compra.id}"
+        compra.monto_cop = peso(sum((Decimal(str(p.monto_cop or 0)) for p in pedidos), Decimal("0")))
+        compra.save()
+        carrito.lineas.all().delete()
+        return compra, ""
+
+
+def _avisar_compra(request, compra):
+    from pedidos.avisos import avisar_pedido_nuevo
+    from pedidos.views import _marcar_contacto
+
+    for pedido in compra.pedidos.select_related("producto", "vendedor"):
+        _marcar_contacto(request, pedido)
+        try:
+            avisar_pedido_nuevo(
+                pedido,
+                request.build_absolute_uri(f"/pedidos/{pedido.id}/?clave={pedido.clave_contacto}"),
+                request.build_absolute_uri(f"/pedidos/{pedido.id}/"),
+            )
+        except Exception:
+            pass
+
+
+def _compra_visible(request, compra):
+    if request.user.is_authenticated and request.user.is_staff:
+        return True
+    comprador = _comprador(request.user)
+    if comprador is not None and compra.comprador_id == comprador.id:
+        return True
+    clave = (request.GET.get("clave") or "").strip()
+    return bool(clave and clave == compra.clave_contacto)
+
+
+@login_required(login_url="entrar_comprador")
+def pagar_compra(request, compra_id):
+    compra = get_object_or_404(Compra.objects.prefetch_related("pedidos__producto", "pedidos__lineas"), pk=compra_id)
+    if not _compra_visible(request, compra):
+        raise Http404("Compra no disponible")
+    pedidos = list(compra.pedidos.all())
+    if compra.estado_pago == "aprobado" or (pedidos and all(p.estado_pago == "aprobado" for p in pedidos)):
+        return redirect(f"/clientes/carrito/resultado/{compra.id}/?clave={compra.clave_contacto}")
+    from pedidos.services import wompi
+
+    wompi_ctx = None
+    if wompi.checkout_listo():
+        destino = request.build_absolute_uri(f"/clientes/carrito/resultado/{compra.id}/?clave={compra.clave_contacto}")
+        wompi_ctx = wompi.contexto_widget(compra, destino)
+    return render(request, "clientes/pagar_compra.html", {
+        "compra": compra,
+        "pedidos": pedidos,
+        "wompi": wompi_ctx,
+        "tarjeta_lista": wompi_ctx is not None,
+    })
+
+
+def resultado_compra(request, compra_id):
+    compra = get_object_or_404(Compra, pk=compra_id)
+    if not _compra_visible(request, compra):
+        raise Http404("Compra no disponible")
+    tx_id = (request.GET.get("id") or "").strip()[:80]
+    if tx_id and compra.estado_pago != "aprobado":
+        from pedidos.services import wompi
+        from pedidos.views import _aplicar_transaccion
+
+        publica = wompi.claves_wompi()[0]
+        tx = wompi.consultar_transaccion(tx_id, publica)
+        misma_ref = tx and (tx.get("reference") or "") == compra.referencia_pago
+        mismo_valor = tx and int(tx.get("amount_in_cents") or 0) == wompi.monto_centavos(compra)
+        if misma_ref and mismo_valor:
+            for pedido in compra.pedidos.all():
+                _aplicar_transaccion(pedido, tx)
+            estado = (tx.get("status") or "").upper()
+            if estado == "APPROVED":
+                compra.estado_pago = "aprobado"
+            elif estado in ("DECLINED", "VOIDED"):
+                compra.estado_pago = "declinado"
+            elif estado == "ERROR":
+                compra.estado_pago = "error"
+            else:
+                compra.estado_pago = "reportado"
+            compra.save(update_fields=["estado_pago"])
+    pedidos = list(compra.pedidos.select_related("producto", "vendedor").prefetch_related("lineas"))
+    return render(request, "clientes/resultado_compra.html", {
+        "compra": compra,
+        "pedidos": pedidos,
+        "pagado": compra.estado_pago == "aprobado",
     })

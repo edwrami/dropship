@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}ERA shop{% endblock %}
+{% block description %}Productos económicos y buscados en ERA shop. Arrastra para ver y compra en la página.{% endblock %}
+{% block meta %}
+  <meta property="og:site_name" content="ERA shop">
+  <meta property="og:title" content="ERA shop">
+  <meta property="og:description" content="Productos económicos y buscados. Arrastra para ver y pide en la página.">
+  <meta property="og:type" content="website">
+  {% if carrusel %}
+    {% with p=carrusel.0 %}
+      {% if p.fotos.all %}<meta property="og:image" content="{{ p.fotos.all.0.url }}">{% elif p.imagen %}<meta property="og:image" content="{{ p.imagen }}">{% endif %}
+    {% endwith %}
+  {% endif %}
+{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">ERA shop</p>
+    <h1>{% if tienda %}{{ tienda.nombre_tienda }}{% else %}Varias tiendas{% endif %}</h1>
+    <p class="lede">Estos son productos económicos y buscados. Arrastra el carrusel para verlos. Si entras a la tienda ves todo su catálogo. Si das Comprar, el producto queda en el carrito y puedes juntar varias tiendas en un solo pago.</p>
+  </div>
+</section>
+{% include "productos/_carrusel.html" %}
+<p><a class="btn sec" href="{% url 'lista_productos' %}">Ver el catálogo</a></p>
+{% endblock %}

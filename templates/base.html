@@ -37,6 +37,7 @@
           <a href="{% url 'salir_vendedor' %}">Salir</a>
         {% elif comprador_actual %}
           <a href="{% url 'datos_comprador' %}">Mi cuenta</a>
+          <a href="{% url 'carrito_compra' %}">Carrito{% if carrito_unidades %} ({{ carrito_unidades }}){% endif %}</a>
           <a href="{% url 'historial_comprador' %}">Mis pedidos</a>
           <a href="{% url 'salir_vendedor' %}">Salir</a>
         {% else %}

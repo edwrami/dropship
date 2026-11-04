@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Compra · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Compra #{{ compra.id }}</p>
+<h2>{% if pagado %}Pago aprobado{% else %}Pago en proceso{% endif %}</h2>
+<p>Total ${{ compra.monto_cop|floatformat:0|intcomma }}. Referencia {{ compra.referencia_pago }}.</p>
+{% for pedido in pedidos %}
+  <section class="card">
+    <h3>Pedido #{{ pedido.id }}{% if pedido.vendedor %} · {{ pedido.vendedor.nombre_tienda }}{% endif %}</h3>
+    <p>{{ pedido.get_estado_pago_display }} · ${{ pedido.monto_cop|floatformat:0|intcomma }}</p>
+    <p><a href="{% url 'conversacion_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Abrir este pedido</a></p>
+  </section>
+{% endfor %}
+<p><a class="btn" href="{% url 'datos_comprador' %}">Volver a mi cuenta</a></p>
+{% endblock %}

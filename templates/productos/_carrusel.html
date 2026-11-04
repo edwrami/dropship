@@ -1,0 +1,26 @@
+{% load humanize %}
+{% if carrusel %}
+<section>
+  <p class="eyebrow">Destacados</p>
+  <h2>Económicos y buscados</h2>
+  <p class="muted">Arrastra hacia el lado para verlos. {% if tienda %}Son de {{ tienda.nombre_tienda }}.{% else %}Salen de varias tiendas.{% endif %}</p>
+  <div class="rail" data-rail>
+    {% for p in carrusel %}
+      <article>
+        <a class="media" href="{% if p.vendedor.slug %}{% url 'tienda_publica' p.vendedor.slug %}{% else %}{% url 'detalle_producto' p.pk %}{% endif %}">
+          {% if p.fotos.all %}<img src="{{ p.fotos.all.0.url }}" alt="">{% elif p.imagen %}<img src="{{ p.imagen }}" alt="">{% endif %}
+        </a>
+        <div class="body">
+          <p class="kicker">{{ p.categoria_es|default:"ERA shop" }} · {{ p.visitas|intcomma }} visitas</p>
+          <h3>{{ p.titulo|truncatechars:48 }}</h3>
+          <p class="price">${{ p.precio_vigente|floatformat:0|intcomma }}</p>
+          {% if p.vendedor.slug %}
+            <p class="meta"><a href="{% url 'tienda_publica' p.vendedor.slug %}">{{ p.vendedor.nombre_tienda }}</a></p>
+          {% endif %}
+          {% include "productos/_comprar.html" %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

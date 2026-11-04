@@ -1,0 +1,11 @@
+{% if comprador_actual %}
+<form method="post" action="{% url 'agregar_compra' %}">
+  {% csrf_token %}
+  <input type="hidden" name="producto" value="{{ p.pk }}">
+  <button class="btn" type="submit">Comprar</button>
+</form>
+{% elif cliente_actual %}
+<a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir</a>
+{% else %}
+<a class="btn" href="{% url 'registro_comprador' %}?next={% url 'detalle_producto' p.pk %}">Comprar</a>
+{% endif %}

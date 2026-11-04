@@ -57,6 +57,10 @@ class Pedido(models.Model):
         "vendedores.Comprador", null=True, blank=True,
         on_delete=models.SET_NULL, related_name="pedidos",
     )
+    compra = models.ForeignKey(
+        "Compra", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="pedidos",
+    )
     modo_envio = models.CharField(max_length=20, blank=True)
     envio_cop = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     transportadora = models.CharField(max_length=120, blank=True)
@@ -131,6 +135,27 @@ class LineaPedido(models.Model):
 
     def __str__(self):
         return f"{self.titulo} × {self.cantidad}"
+
+
+class Compra(models.Model):
+    """Un cobro del comprador. Puede reunir pedidos de varias tiendas."""
+
+    comprador = models.ForeignKey(
+        "vendedores.Comprador", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="compras",
+    )
+    referencia_pago = models.CharField(max_length=80, unique=True, blank=True)
+    monto_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    estado_pago = models.CharField(max_length=20, choices=Pedido.ESTADOS_PAGO, default="pendiente")
+    cliente_email = models.EmailField(blank=True)
+    clave_contacto = models.CharField(max_length=64, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creado"]
+
+    def __str__(self):
+        return f"Compra #{self.id}"
 
 
 class MensajePedido(models.Model):

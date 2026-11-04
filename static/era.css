@@ -237,6 +237,31 @@ th { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; colo
 .grupo-cat { border-top: 1px solid var(--line); padding: 10px 0; }
 .grupo-cat label { font-weight: 500; color: var(--ink); margin: 3px 0; }
 
+.rail {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 2px 12px;
+  cursor: grab;
+}
+.rail:active { cursor: grabbing; }
+.rail article {
+  flex: 0 0 240px;
+  scroll-snap-align: start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.rail .media { display: block; aspect-ratio: 1; background: #f0f0f0; }
+.rail .media img { width: 100%; height: 100%; object-fit: cover; }
+.rail .body { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.rail h3 { margin: 0; font-size: 1rem; }
+
 @media (max-width: 860px) {
   .hero, .layout, .pay-grid, .mayor-item { grid-template-columns: 1fr; }
   .header-row { align-items: flex-start; flex-direction: column; }

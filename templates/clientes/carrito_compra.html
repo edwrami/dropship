@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Carrito · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ comprador.nombre }}</p>
+<h2>Carrito</h2>
+<p class="muted">Puedes juntar varios productos y varias tiendas. Pagas una sola vez el precio de cada uno. El porcentaje de ERA shop y la tarifa de Wompi los asume cada tienda.</p>
+{% if grupos %}
+  <form method="post">
+    {% csrf_token %}
+    {% for grupo in grupos %}
+      <section class="card">
+        <h3>{% if grupo.tienda %}<a href="{% url 'tienda_publica' grupo.tienda.slug %}">{{ grupo.tienda.nombre_tienda }}</a>{% else %}ERA shop{% endif %}</h3>
+        {% for item in grupo.items %}
+          <p>
+            {{ item.producto.titulo }}
+            · ${{ item.precio|floatformat:0|intcomma }}
+            {% if item.envio %} · envío ${{ item.envio|floatformat:0|intcomma }}{% endif %}
+          </p>
+          <label>Cantidad
+            <input name="cantidad-{{ item.linea.id }}" type="number" min="1" max="20" value="{{ item.linea.cantidad }}">
+          </label>
+          <p><button class="btn sec" type="submit" name="accion" value="quitar-{{ item.linea.id }}" form="quitar-{{ item.linea.id }}">Quitar</button></p>
+        {% endfor %}
+        <p class="price">Tienda ${{ grupo.suma|floatformat:0|intcomma }}</p>
+      </section>
+    {% endfor %}
+    <p class="price">Total ${{ total|floatformat:0|intcomma }}</p>
+    <button class="btn sec" type="submit" name="accion" value="actualizar">Actualizar cantidades</button>
+    <button class="btn" type="submit" name="accion" value="pagar">Pagar</button>
+  </form>
+  {% for grupo in grupos %}
+    {% for item in grupo.items %}
+      <form id="quitar-{{ item.linea.id }}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="quitar-{{ item.linea.id }}">
+      </form>
+    {% endfor %}
+  {% endfor %}
+{% else %}
+  <p>El carrito está vacío. En tu cuenta aparecen productos de todas las tiendas.</p>
+  <p><a class="btn" href="{% url 'datos_comprador' %}">Ir a mi cuenta</a></p>
+{% endif %}
+{% endblock %}

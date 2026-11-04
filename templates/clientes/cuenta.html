@@ -1,8 +1,134 @@
 {% extends "base.html" %}
+{% load humanize %}
 {% block title %}Mi cuenta · ERA shop{% endblock %}
 {% block content %}
   <p class="kicker">{{ comprador.ciudad }}</p>
   <h2>{{ comprador.nombre }}</h2>
+  {% if aleatorio %}
+    <p class="muted">Productos al azar de todas las tiendas. Entra a una tienda para ver todo su catálogo, o da Comprar para sumarlo al carrito. Puedes juntar varias tiendas y pagar una sola vez.</p>
+  {% else %}
+    <p class="muted">{{ total }} producto{{ total|pluralize }} con esos criterios. Entra a la tienda para ver el resto, o da Comprar para llevarlo al carrito.</p>
+  {% endif %}
+
+  {% include "productos/_carrusel.html" %}
+
+  <details class="filters" open>
+    <summary>Buscar</summary>
+    <form class="filters-grid" method="get">
+      <label>Palabra<input name="q" value="{{ request.GET.q }}" placeholder="Nombre, marca, ciudad"></label>
+      <label>Categoría
+        <select name="categoria">
+          <option value="">Todas</option>
+          {% for g in grupos %}
+            <option value="{{ g.id }}" {% if request.GET.categoria == g.id|stringformat:"s" %}selected{% endif %}>{{ g.nombre }}</option>
+            {% for h in g.hijos.all %}
+              <option value="{{ h.id }}" {% if request.GET.categoria == h.id|stringformat:"s" %}selected{% endif %}>— {{ h.nombre }}</option>
+            {% endfor %}
+          {% endfor %}
+        </select>
+      </label>
+      <label>Ciudad<input name="ciudad" value="{{ request.GET.ciudad }}" placeholder="Ciudad de despacho"></label>
+      <label>Departamento
+        <select name="departamento">
+          <option value="">Todos</option>
+          {% for d in departamentos %}
+            <option value="{{ d }}" {% if request.GET.departamento == d %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Tipo de vendedor
+        <select name="tipo">
+          <option value="">Todos</option>
+          {% for clave, nombre in tipos %}
+            <option value="{{ clave }}" {% if request.GET.tipo == clave %}selected{% endif %}>{{ nombre }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Rango de precio
+        <select name="rango">
+          <option value="">Todos</option>
+          {% for clave, nombre in rangos %}
+            <option value="{{ clave }}" {% if request.GET.rango == clave %}selected{% endif %}>{{ nombre }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Precio mínimo<input name="precio_min" value="{{ request.GET.precio_min }}" inputmode="numeric"></label>
+      <label>Precio máximo<input name="precio_max" value="{{ request.GET.precio_max }}" inputmode="numeric"></label>
+      <label>Condición
+        <select name="condicion">
+          <option value="">Todas</option>
+          {% for clave, nombre in condiciones %}
+            <option value="{{ clave }}" {% if request.GET.condicion == clave %}selected{% endif %}>{{ nombre }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Entrega
+        <select name="entrega">
+          <option value="">Cualquiera</option>
+          {% for dias, nombre in entregas %}
+            <option value="{{ dias }}" {% if request.GET.entrega == dias|stringformat:"s" %}selected{% endif %}>{{ nombre }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Marca<input name="marca" value="{{ request.GET.marca }}"></label>
+      <label>Color<input name="color" value="{{ request.GET.color }}"></label>
+      <label>Talla<input name="talla" value="{{ request.GET.talla }}"></label>
+      <label>Orden
+        <select name="orden">
+          <option value="recientes" {% if not request.GET.orden or request.GET.orden == "recientes" %}selected{% endif %}>Más recientes</option>
+          <option value="precio_asc" {% if request.GET.orden == "precio_asc" %}selected{% endif %}>Menor precio</option>
+          <option value="precio_desc" {% if request.GET.orden == "precio_desc" %}selected{% endif %}>Mayor precio</option>
+          <option value="entrega" {% if request.GET.orden == "entrega" %}selected{% endif %}>Entrega más rápida</option>
+        </select>
+      </label>
+      <div class="checks">
+        <label><input type="checkbox" name="envio" value="1" {% if request.GET.envio == "1" %}checked{% endif %}> Envío gratis</label>
+        <label><input type="checkbox" name="garantia" value="1" {% if request.GET.garantia == "1" %}checked{% endif %}> Con garantía</label>
+      </div>
+      <div>
+        <button class="btn" type="submit">Buscar</button>
+        <a class="btn sec" href="{% url 'datos_comprador' %}">Limpiar</a>
+      </div>
+    </form>
+  </details>
+
+  <div class="catalog">
+    {% for p in productos %}
+      <article class="product">
+        <a class="media" href="{% if p.vendedor.slug %}{% url 'tienda_publica' p.vendedor.slug %}{% else %}{% url 'detalle_producto' p.pk %}{% endif %}">
+          {% if p.fotos.all %}<img src="{{ p.fotos.all.0.url }}" alt="">{% elif p.imagen %}<img src="{{ p.imagen }}" alt="">{% endif %}
+        </a>
+        <div class="body">
+          <p class="kicker">{{ p.categoria_es|default:"ERA shop" }}</p>
+          <h3><a href="{% if p.vendedor.slug %}{% url 'tienda_publica' p.vendedor.slug %}{% else %}{% url 'detalle_producto' p.pk %}{% endif %}">{{ p.titulo|truncatechars:64 }}</a></h3>
+          {% if p.en_promocion %}
+            <p class="price">${{ p.precio_promo_cop|floatformat:0|intcomma }} <s>${{ p.precio_final_cop|floatformat:0|intcomma }}</s></p>
+          {% else %}
+            <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
+          {% endif %}
+          <p class="meta">
+            {% if p.vendedor.slug %}<a href="{% url 'tienda_publica' p.vendedor.slug %}">Entrar a {{ p.vendedor.nombre_tienda }}</a>{% endif %}
+          </p>
+          {% include "productos/_comprar.html" %}
+        </div>
+      </article>
+    {% empty %}
+      <p>No hay productos con esos criterios.</p>
+    {% endfor %}
+  </div>
+  {% if pagina and pagina.has_other_pages %}
+    <p>
+      {% if pagina.has_previous %}
+        <a class="btn sec" href="?{% if filtros_qs %}{{ filtros_qs }}&{% endif %}page={{ pagina.previous_page_number }}">Anterior</a>
+      {% endif %}
+      Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}
+      {% if pagina.has_next %}
+        <a class="btn sec" href="?{% if filtros_qs %}{{ filtros_qs }}&{% endif %}page={{ pagina.next_page_number }}">Siguiente</a>
+      {% endif %}
+    </p>
+  {% endif %}
+
+  <h3>Mis datos</h3>
   <p class="muted">Estos datos se usan en cada pedido y quedan en ERA shop y en la tienda.</p>
   <form method="post" style="max-width:720px">{% csrf_token %}
     {{ form.as_p }}

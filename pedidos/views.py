@@ -21,7 +21,7 @@ from vendedores.opciones import TIPOS
 from vendedores.services import aplicar_comision
 
 from .avisos import avisar_estado, avisar_mensaje, avisar_pedido_nuevo
-from .models import Calificacion, CuentaPlataforma, MensajePedido, Pedido, Reclamo
+from .models import Calificacion, Compra, CuentaPlataforma, MensajePedido, Pedido, Reclamo
 from .resumen import pdf_pedido
 from .services import wompi
 
@@ -317,6 +317,21 @@ def wompi_evento(request):
     ref = (tx.get("reference") or "").strip()
     if not ref:
         return HttpResponse("ok")
+    compra = Compra.objects.filter(referencia_pago=ref).first()
+    if compra:
+        for pedido in compra.pedidos.all():
+            _aplicar_transaccion(pedido, tx)
+        status = (tx.get("status") or "").upper()
+        if status == "APPROVED":
+            compra.estado_pago = "aprobado"
+        elif status in ("DECLINED", "VOIDED"):
+            compra.estado_pago = "declinado"
+        elif status == "ERROR":
+            compra.estado_pago = "error"
+        elif compra.estado_pago != "aprobado":
+            compra.estado_pago = "reportado"
+        compra.save(update_fields=["estado_pago"])
+        return HttpResponse("ok")
     pedido = Pedido.objects.filter(referencia_pago=ref).first()
     if not pedido:
         return HttpResponse("ok")
@@ -374,11 +389,16 @@ def _rol_pedido(request, pedido):
     if request.user.is_authenticated and request.user.is_staff:
         return "plataforma"
     if request.user.is_authenticated:
-        from vendedores.models import ClienteTienda, Vendedor
+        from vendedores.models import ClienteTienda, Comprador, Vendedor
         try:
             if request.user.vendedor.id == pedido.vendedor_id:
                 return "vendedor"
         except Vendedor.DoesNotExist:
+            pass
+        try:
+            if pedido.comprador_id and request.user.comprador.id == pedido.comprador_id:
+                return "cliente"
+        except Comprador.DoesNotExist:
             pass
         try:
             if request.user.cliente_tienda.id == pedido.cliente_tienda_id:

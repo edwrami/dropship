@@ -87,6 +87,15 @@
         </form>
         <p class="muted">Se suma al pedido de este proveedor. La cuenta queda guardada para volver a consultarla.</p>
         <p><a href="{% url 'carrito_pedido' producto.vendedor.slug %}">Ver la suma</a></p>
+      {% elif comprador_actual %}
+        <form method="post" action="{% url 'agregar_compra' %}">
+          {% csrf_token %}
+          <input type="hidden" name="producto" value="{{ producto.pk }}">
+          <label>Cantidad<input name="cantidad" type="number" min="1" max="20" value="1"></label>
+          <button class="btn" type="submit">Comprar</button>
+        </form>
+        <p class="muted">Se suma al carrito. Puedes juntar varios productos y varias tiendas y pagarlos en un solo cobro.</p>
+        <p><a href="{% url 'carrito_compra' %}">Ver el carrito</a></p>
       {% else %}
         <form method="post" action="{% url 'crear_pedido' producto.pk %}">
           {% csrf_token %}

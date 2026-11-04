@@ -143,8 +143,29 @@ function prepararSlider(slider) {
   });
 }
 
+function prepararRiel(riel) {
+  let activo = false;
+  let inicio = 0;
+  let izquierda = 0;
+  riel.addEventListener("pointerdown", function (evento) {
+    if (evento.target.closest("a, button, input, select, textarea")) return;
+    activo = true;
+    inicio = evento.clientX;
+    izquierda = riel.scrollLeft;
+    riel.setPointerCapture(evento.pointerId);
+  });
+  riel.addEventListener("pointermove", function (evento) {
+    if (!activo) return;
+    riel.scrollLeft = izquierda - (evento.clientX - inicio);
+  });
+  function soltar() { activo = false; }
+  riel.addEventListener("pointerup", soltar);
+  riel.addEventListener("pointercancel", soltar);
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll("[data-slider]").forEach(prepararSlider);
+  document.querySelectorAll("[data-rail]").forEach(prepararRiel);
   document.querySelectorAll("[data-share]").forEach(prepararCompartir);
   document.querySelectorAll("[data-abrir-nequi]").forEach(function (boton) {
     boton.addEventListener("click", function () { abrirNequi(boton.dataset.abrirNequi); });

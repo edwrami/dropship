@@ -192,3 +192,31 @@ class CarritoLinea(models.Model):
 
     def __str__(self):
         return f"{self.producto_id} × {self.cantidad}"
+
+
+class CarritoComprador(models.Model):
+    comprador = models.OneToOneField(
+        Comprador, related_name="carrito", on_delete=models.CASCADE,
+    )
+    actualizado = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Carrito de {self.comprador_id}"
+
+
+class CarritoCompradorLinea(models.Model):
+    carrito = models.ForeignKey(
+        CarritoComprador, related_name="lineas", on_delete=models.CASCADE,
+    )
+    producto = models.ForeignKey("productos.Producto", on_delete=models.PROTECT)
+    cantidad = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["carrito", "producto"], name="carrito_comprador_producto",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.producto_id} × {self.cantidad}"

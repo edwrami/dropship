@@ -110,6 +110,38 @@ def aplicar_comision(pedido):
         pedido.estado_comision = "por_confirmar"
 
 
+def cargos_mostrador_grupo(pedidos):
+    """Un solo cobro de mostrador. El cliente paga los precios. Cada tienda asume su porcentaje y una parte de Wompi."""
+    pedidos = [p for p in pedidos if p.vendedor_id]
+    if not pedidos:
+        return
+    if len(pedidos) == 1:
+        aplicar_comision(pedidos[0])
+        return
+    total = sum((Decimal(str(p.monto_cop or 0)) for p in pedidos), Decimal("0"))
+    tarifa = tarifa_wompi(total)
+    detalle, _mayor = porcentajes_comision()
+    asignado = Decimal("0")
+    for i, pedido in enumerate(pedidos):
+        monto = Decimal(str(pedido.monto_cop or 0))
+        comision = peso(monto * detalle / Decimal("100"))
+        if i == len(pedidos) - 1:
+            parte = tarifa - asignado
+        else:
+            parte = peso(tarifa * monto / total) if total else Decimal("0")
+            asignado += parte
+        if parte < 0:
+            parte = Decimal("0")
+        pedido.comision_pct = detalle
+        pedido.comision_cop = comision
+        pedido.tarifa_pasarela_cop = parte
+        neto = monto - comision - parte
+        pedido.neto_vendedor = neto if neto > 0 else Decimal("0")
+        pedido.es_mayor = False
+        if pedido.estado_comision in ("", "exenta"):
+            pedido.estado_comision = "por_confirmar"
+
+
 def activar_cobro_comision(pedido):
     """La liquidación corre cuando el cliente ya pagó."""
     if not pedido.vendedor_id or pedido.estado_comision != "por_confirmar":

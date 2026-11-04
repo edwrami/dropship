@@ -6,6 +6,7 @@ from . import views
 
 urlpatterns = [
     path("", views.lista_productos, name="lista_productos"),
+    path("facebook/", views.carrusel_facebook, name="carrusel_facebook"),
     path("agregar/", views.agregar_producto, name="agregar_producto"),
     path("tienda/<slug:slug>/", tienda_publica, name="tienda_publica"),
     path("tienda/<slug:slug>/estado/", estado_tienda, name="estado_tienda"),

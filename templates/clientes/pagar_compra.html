@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Pagar · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Compra</p>
+<h2>Pagar ${{ compra.monto_cop|floatformat:0|intcomma }}</h2>
+<p>Referencia <strong>{{ compra.referencia_pago }}</strong>. Un solo cobro reparte el pedido en cada tienda.</p>
+{% for pedido in pedidos %}
+  <section class="card">
+    <h3>{% if pedido.vendedor %}{{ pedido.vendedor.nombre_tienda }}{% else %}Pedido #{{ pedido.id }}{% endif %}</h3>
+    {% if pedido.lineas.all %}
+      <ul>
+        {% for l in pedido.lineas.all %}
+          <li>{{ l.titulo }} · {{ l.cantidad }} × ${{ l.precio_unitario|floatformat:0|intcomma }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>{{ pedido.producto.titulo }} · {{ pedido.cantidad }} und. · ${{ pedido.monto_cop|floatformat:0|intcomma }}</p>
+    {% endif %}
+  </section>
+{% endfor %}
+<section class="card" style="max-width:520px">
+  <p class="eyebrow">Pago en la página</p>
+  <h3>Nequi, PSE o tarjeta</h3>
+  <p>El dinero entra por ERA shop. Cuando el banco confirma, cada pedido queda registrado.</p>
+  {% if tarjeta_lista %}
+    <form>
+      <script
+        src="https://checkout.wompi.co/widget.js"
+        data-render="button"
+        data-public-key="{{ wompi.public_key }}"
+        data-currency="{{ wompi.currency }}"
+        data-amount-in-cents="{{ wompi.amount_in_cents }}"
+        data-reference="{{ wompi.reference }}"
+        data-signature:integrity="{{ wompi.signature }}"
+        data-redirect-url="{{ wompi.redirect_url }}"
+        {% if wompi.customer_email %}data-customer-data:email="{{ wompi.customer_email }}"{% endif %}
+      ></script>
+    </form>
+  {% else %}
+    <p>El cobro de la página todavía no está activo.</p>
+  {% endif %}
+</section>
+{% endblock %}

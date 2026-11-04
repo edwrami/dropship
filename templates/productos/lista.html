@@ -15,6 +15,8 @@
   </aside>
 </section>
 
+{% include "productos/_carrusel.html" %}
+
 <details class="filters" open>
   <summary>Buscar</summary>
   <form class="filters-grid" method="get">
@@ -98,12 +100,12 @@
 <div class="catalog">
   {% for p in productos %}
     <article class="product">
-      <a class="media" href="{% url 'detalle_producto' p.pk %}">
+      <a class="media" href="{% if p.vendedor.slug %}{% url 'tienda_publica' p.vendedor.slug %}{% else %}{% url 'detalle_producto' p.pk %}{% endif %}">
         {% if p.fotos.all %}<img src="{{ p.fotos.all.0.url }}" alt="">{% elif p.imagen %}<img src="{{ p.imagen }}" alt="">{% endif %}
       </a>
       <div class="body">
         <p class="kicker">{{ p.categoria_es|default:"ERA shop" }}</p>
-        <h3>{{ p.titulo|truncatechars:64 }}</h3>
+        <h3><a href="{% if p.vendedor.slug %}{% url 'tienda_publica' p.vendedor.slug %}{% else %}{% url 'detalle_producto' p.pk %}{% endif %}">{{ p.titulo|truncatechars:64 }}</a></h3>
         {% if p.en_promocion %}
           <p class="kicker">Promoción</p>
           <p class="price">${{ p.precio_promo_cop|floatformat:0|intcomma }} <s>${{ p.precio_final_cop|floatformat:0|intcomma }}</s></p>
@@ -114,10 +116,10 @@
           {% if p.ciudad_despacho %}{{ p.ciudad_despacho }}{% endif %}
           {% if p.entrega_texto %} · {{ p.entrega_texto }}{% endif %}
           {% if p.modo_envio == "contraentrega" %} · Envío contraentrega{% elif p.modo_envio == "aparte" %} · Envío ${{ p.costo_envio_cop|floatformat:0|intcomma }}{% else %} · Envío incluido{% endif %}
-          {% if p.vendedor %}<br>{{ p.vendedor.nombre_tienda }}{% endif %}
+          {% if p.vendedor.slug %}<br><a href="{% url 'tienda_publica' p.vendedor.slug %}">Entrar a {{ p.vendedor.nombre_tienda }}</a>{% endif %}
           <br>{{ p.visitas|intcomma }} visitas
         </p>
-        <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir</a>
+        {% include "productos/_comprar.html" %}
       </div>
     </article>
   {% empty %}

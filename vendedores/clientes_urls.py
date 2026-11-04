@@ -16,4 +16,8 @@ urlpatterns = [
     path("cuenta/registro/", clientes.registro_comprador, name="registro_comprador"),
     path("cuenta/entrar/", clientes.entrar_comprador, name="entrar_comprador"),
     path("cuenta/", clientes.datos_comprador, name="datos_comprador"),
+    path("carrito/agregar/", clientes.agregar_compra, name="agregar_compra"),
+    path("carrito/", clientes.carrito_compra, name="carrito_compra"),
+    path("carrito/pagar/<int:compra_id>/", clientes.pagar_compra, name="pagar_compra"),
+    path("carrito/resultado/<int:compra_id>/", clientes.resultado_compra, name="resultado_compra"),
 ]

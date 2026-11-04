@@ -1,4 +1,5 @@
 ﻿from decimal import Decimal, InvalidOperation
+from itertools import zip_longest
 
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -39,13 +40,21 @@ def _decimal(valor):
         return None
 
 
-def lista_productos(request):
-    from pedidos.services.visitas import registrar_visita
-    registrar_visita(request)
-    aplicar_sanciones()
+_CLAVES_FILTRO = (
+    "q", "categoria", "ciudad", "departamento", "tipo", "rango",
+    "precio_min", "precio_max", "condicion", "entrega", "marca",
+    "color", "talla", "envio", "garantia", "orden",
+)
+
+
+def hay_filtros(request):
+    g = request.GET
+    return any((g.get(clave) or "").strip() for clave in _CLAVES_FILTRO)
+
+
+def catalogo_filtrado(request):
     qs = _catalogo()
     g = request.GET
-
     q = (g.get("q") or "").strip()
     if q:
         qs = qs.filter(
@@ -128,22 +137,95 @@ def lista_productos(request):
         qs = qs.order_by("tiempo_entrega_max", "-creado")
     else:
         qs = qs.order_by("-creado")
+    return qs
 
-    total = qs.count()
-    pagina = Paginator(qs, 24).get_page(g.get("page"))
-    params = g.copy()
-    params.pop("page", None)
-    grupos = Categoria.objects.filter(padre__isnull=True).prefetch_related("hijos")
-    return render(request, "productos/lista.html", {
-        "productos": pagina,
-        "total": total,
-        "filtros_qs": params.urlencode(),
-        "grupos": grupos,
+
+def opciones_busqueda():
+    return {
+        "grupos": Categoria.objects.filter(padre__isnull=True).prefetch_related("hijos"),
         "departamentos": DEPARTAMENTOS,
         "tipos": TIPOS,
         "rangos": RANGOS,
         "condiciones": CONDICIONES,
         "entregas": ENTREGAS,
+    }
+
+
+def mezcla_carrusel(qs, limite=8):
+    """Económicos y buscados, de una tienda o de varias, sin repetir."""
+    baratos = list(qs.order_by("precio_final_cop", "-visitas")[:limite])
+    buscados = list(qs.order_by("-visitas", "precio_final_cop")[:limite])
+    vistos = []
+    ids = set()
+    for pareja in zip_longest(buscados, baratos):
+        for producto in pareja:
+            if producto is not None and producto.id not in ids:
+                ids.add(producto.id)
+                vistos.append(producto)
+    return vistos
+
+
+def vitrina_comprador(request):
+    """Productos del panel. Con filtros, respeta la búsqueda. Sin filtros, mezcla tiendas al azar."""
+    qs = catalogo_filtrado(request)
+    params = request.GET.copy()
+    params.pop("page", None)
+    if hay_filtros(request):
+        pagina = Paginator(qs, 24).get_page(request.GET.get("page"))
+        productos = pagina.object_list
+        total = pagina.paginator.count
+        aleatorio = False
+    else:
+        pagina = None
+        productos = list(qs.order_by("?")[:24])
+        total = len(productos)
+        aleatorio = True
+    datos = opciones_busqueda()
+    datos.update({
+        "productos": productos,
+        "pagina": pagina,
+        "total": total,
+        "aleatorio": aleatorio,
+        "filtros_qs": params.urlencode(),
+        "carrusel": mezcla_carrusel(catalogo_filtrado(request) if hay_filtros(request) else _catalogo()),
+    })
+    return datos
+
+
+def lista_productos(request):
+    from pedidos.services.visitas import registrar_visita
+    registrar_visita(request)
+    aplicar_sanciones()
+    qs = catalogo_filtrado(request)
+    total = qs.count()
+    pagina = Paginator(qs, 24).get_page(request.GET.get("page"))
+    params = request.GET.copy()
+    params.pop("page", None)
+    ctx = opciones_busqueda()
+    ctx.update({
+        "productos": pagina,
+        "total": total,
+        "filtros_qs": params.urlencode(),
+        "carrusel": mezcla_carrusel(_catalogo()),
+        "carrusel_varias": True,
+    })
+    return render(request, "productos/lista.html", ctx)
+
+
+def carrusel_facebook(request):
+    from pedidos.services.visitas import registrar_visita
+    registrar_visita(request)
+    qs = _catalogo()
+    slug = (request.GET.get("tienda") or "").strip()
+    tienda = None
+    if slug:
+        from vendedores.models import Vendedor
+        tienda = Vendedor.objects.filter(slug=slug, estado="activo").first()
+        qs = qs.filter(vendedor=tienda) if tienda is not None else qs.none()
+    return render(request, "productos/facebook.html", {
+        "carrusel": mezcla_carrusel(qs, 12),
+        "tienda": tienda,
+        "varias": tienda is None,
     })
 
 
