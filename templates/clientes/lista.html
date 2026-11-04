@@ -15,7 +15,7 @@
     <p>Suma de la mercancía</p>
     <p class="price" id="suma-valor">${{ suma_bienes|floatformat:0|intcomma }}</p>
     <p id="suma-texto">{{ suma_productos }} productos · {{ suma_unidades }} unidades guardadas.</p>
-    <p class="muted">El envío y el IVA se calculan al cerrar el pedido. En esa venta ERA shop retiene {{ comision_mayor_pct|floatformat:-2 }}% y Wompi cobra su tarifa. Esos valores no se suman a lo que pagas.</p>
+    <p class="muted">Al cerrar el pedido se suman el envío, el IVA si lo eliges, el {{ comision_mayor_pct|floatformat:-2 }}% de ERA shop y la tarifa de Wompi.</p>
   </section>
 
   <form method="post" id="lista-pedido">

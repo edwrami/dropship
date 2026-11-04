@@ -449,6 +449,24 @@ def resumen_pedido(request, pedido_id):
     return respuesta
 
 
+def bodega_pedido(request, pedido_id):
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("producto", "vendedor").prefetch_related("lineas__producto"),
+        pk=pedido_id,
+    )
+    if _rol_pedido(request, pedido) is None or not pedido.es_mayor:
+        raise Http404("Pedido no disponible")
+    from .bodega import docx_bodega
+
+    archivo = docx_bodega(pedido)
+    respuesta = HttpResponse(
+        archivo,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    respuesta["Content-Disposition"] = f'attachment; filename="pedido-{pedido.id}-bodega.docx"'
+    return respuesta
+
+
 def _publicar_mensaje(request, pedido, rol):
     texto = (request.POST.get("texto") or "").strip()
     if not texto:

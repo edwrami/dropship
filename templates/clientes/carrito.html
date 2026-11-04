@@ -38,16 +38,16 @@
         <label><input type="radio" name="factura" value="sin" checked> Sin IVA</label>
         <label><input type="radio" name="factura" value="con"> Con IVA del {{ iva_pct|floatformat:-2 }}% sobre la mercancía</label>
       </fieldset>
-      <p class="muted">Wompi cobra IVA sobre su propia tarifa en todos los pagos. Ese IVA no se puede quitar: es el impuesto de la pasarela, no el de tu factura.</p>
+      <p class="muted">El IVA de la factura es el de la mercancía. El IVA de Wompi va dentro de su tarifa y también se suma al total.</p>
 
       <section class="card" id="cuenta-pedido">
         <p>Mercancía <strong id="cuenta-bienes">${{ bienes|floatformat:0|intcomma }}</strong></p>
         <p>Envío <strong id="cuenta-envio">{% if envio %}${{ envio|floatformat:0|intcomma }}{% else %}incluido o contraentrega{% endif %}</strong></p>
         <p>IVA de la factura <strong id="cuenta-iva">$0</strong></p>
+        <p>ERA shop <strong id="cuenta-pct">{{ comision_mayor_pct|floatformat:-2 }}%</strong> <strong id="cuenta-comision">${{ comision_sin|floatformat:0|intcomma }}</strong></p>
+        <p>Wompi <strong id="cuenta-wompi">${{ wompi_sin|floatformat:0|intcomma }}</strong> ({{ wompi_pct }}% + ${{ wompi_fijo }}, más el {{ wompi_iva }}% de IVA solo sobre esa tarifa)</p>
         <p class="price">Total a pagar <span id="cuenta-total">${{ total_sin|floatformat:0|intcomma }}</span></p>
-        <p>De ese pago, ERA shop retiene <strong id="cuenta-pct">{{ comision_mayor_pct|floatformat:-2 }}%</strong>: <strong id="cuenta-comision">${{ comision_sin|floatformat:0|intcomma }}</strong>.</p>
-        <p>Wompi cobra <strong id="cuenta-wompi">${{ wompi_sin|floatformat:0|intcomma }}</strong> ({{ wompi_pct }}% + ${{ wompi_fijo }}, más el {{ wompi_iva }}% de IVA solo sobre esa tarifa).</p>
-        <p>Al proveedor le quedan <strong id="cuenta-neto">${{ neto_sin|floatformat:0|intcomma }}</strong>. Esos dos descuentos no se suman a tu total: salen del pago.</p>
+        <p>Esos dos cargos se suman. Al proveedor le queda la mercancía, el envío y el IVA de la factura: <strong id="cuenta-neto">${{ neto_sin|floatformat:0|intcomma }}</strong>.</p>
       </section>
       <button class="btn" type="submit" name="accion" value="confirmar">Hacer el pedido y pagar</button>
     </form>
@@ -79,18 +79,28 @@
         });
         var con = form.querySelector("input[name=factura]:checked");
         var iva = con && con.value === "con" ? Math.round(bienes * ivaPct / 100) : 0;
-        var total = Math.round(bienes + envio + iva);
-        var comision = Math.round(total * pct / 100);
-        var tarifa = Math.round((total * wompiPct / 100 + fijo) * (1 + wompiIva / 100));
-        var neto = total - comision - tarifa;
-        if (neto < 0) neto = 0;
+        var base = Math.round(bienes + envio + iva);
+        var p = pct / 100;
+        var w = wompiPct / 100;
+        var factor = 1 + wompiIva / 100;
+        var comision = Math.round(base * p);
+        var total = Math.round((base * (1 + p) + fijo * factor) / (1 - w * factor));
+        var tarifa = Math.round((total * w + fijo) * factor);
+        var i;
+        for (i = 0; i < 4; i++) {
+          var ajustado = Math.round(base + comision + tarifa);
+          if (ajustado === total) break;
+          total = ajustado;
+          tarifa = Math.round((total * w + fijo) * factor);
+        }
+        tarifa = Math.round(total - base - comision);
         document.getElementById("cuenta-bienes").textContent = dinero(bienes);
         document.getElementById("cuenta-envio").textContent = envio ? dinero(envio) : "incluido o contraentrega";
         document.getElementById("cuenta-iva").textContent = dinero(iva);
         document.getElementById("cuenta-total").textContent = dinero(total);
         document.getElementById("cuenta-comision").textContent = dinero(comision);
         document.getElementById("cuenta-wompi").textContent = dinero(tarifa);
-        document.getElementById("cuenta-neto").textContent = dinero(neto);
+        document.getElementById("cuenta-neto").textContent = dinero(base);
       }
       form.addEventListener("input", pintar);
       form.addEventListener("change", pintar);

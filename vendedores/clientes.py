@@ -365,11 +365,11 @@ def carrito_pedido(request, slug):
                 return redirect(f"/pedidos/pagar/{pedido.id}/?clave={pedido.clave_contacto}")
     filas, bienes, envio, unidades = _filas_carrito(carrito)
     pct_iva, iva = iva_mercancia(bienes, True)
-    from .services import porcentajes_comision, tarifa_wompi
+    from .services import porcentajes_comision, total_con_cargos
 
     _detalle, mayor = porcentajes_comision()
-    total_sin = peso(bienes + envio)
-    total_con = peso(bienes + envio + iva)
+    sin = total_con_cargos(bienes + envio, mayor)
+    con = total_con_cargos(bienes + envio + iva, mayor)
     return render(request, "clientes/carrito.html", {
         "proveedor": proveedor,
         "cliente": cliente,
@@ -379,14 +379,14 @@ def carrito_pedido(request, slug):
         "unidades": unidades,
         "iva_pct": pct_iva,
         "iva_cop": iva,
-        "total_sin": total_sin,
-        "total_con": total_con,
-        "comision_sin": peso(total_sin * mayor / Decimal("100")),
-        "wompi_sin": tarifa_wompi(total_sin),
-        "comision_con": peso(total_con * mayor / Decimal("100")),
-        "wompi_con": tarifa_wompi(total_con),
-        "neto_sin": max(total_sin - peso(total_sin * mayor / Decimal("100")) - tarifa_wompi(total_sin), 0),
-        "neto_con": max(total_con - peso(total_con * mayor / Decimal("100")) - tarifa_wompi(total_con), 0),
+        "total_sin": sin["total"],
+        "comision_sin": sin["comision"],
+        "wompi_sin": sin["tarifa"],
+        "neto_sin": sin["neto"],
+        "total_con": con["total"],
+        "comision_con": con["comision"],
+        "wompi_con": con["tarifa"],
+        "neto_con": con["neto"],
     })
 
 
@@ -472,8 +472,6 @@ def _confirmar_carrito(request, cliente, proveedor, carrito):
         contacto_nequi=proveedor.nequi,
         clave_contacto=uuid.uuid4().hex,
     )
-    extra = (pedido.id % 89) + 1
-    pedido.monto_cop = base + iva + extra
     pedido.referencia_pago = f"PED-{pedido.id}"
     aplicar_comision(pedido)
     pedido.save()

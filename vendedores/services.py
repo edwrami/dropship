@@ -46,8 +46,39 @@ def iva_mercancia(base, con_iva):
     return pct, peso(Decimal(str(base or 0)) * pct / Decimal("100"))
 
 
+def total_con_cargos(base, pct):
+    """Suma el porcentaje de ERA shop y la tarifa de Wompi al valor del pedido.
+
+    El proveedor recibe la base. El cliente paga la base más esos dos cargos.
+    La tarifa se calcula sobre el total que entra a Wompi.
+    """
+    base = peso(base)
+    porcentaje = Decimal(str(pct or 0)) / Decimal("100")
+    comision = peso(base * porcentaje)
+    variable = Decimal(str(getattr(settings, "WOMPI_PCT", "2.65"))) / Decimal("100")
+    fijo = Decimal(str(getattr(settings, "WOMPI_FIJO_COP", 700)))
+    factor = Decimal("1") + Decimal(str(getattr(settings, "WOMPI_IVA_PCT", 19))) / Decimal("100")
+    denominador = Decimal("1") - variable * factor
+    total = peso((base * (Decimal("1") + porcentaje) + fijo * factor) / denominador)
+    tarifa = tarifa_wompi(total)
+    for _ in range(4):
+        ajustado = peso(base + comision + tarifa)
+        if ajustado == total:
+            break
+        total = ajustado
+        tarifa = tarifa_wompi(total)
+    tarifa = peso(total - base - comision)
+    return {
+        "base": base,
+        "total": total,
+        "comision": comision,
+        "tarifa": tarifa,
+        "neto": base,
+    }
+
+
 def aplicar_comision(pedido):
-    """El vendedor asume el porcentaje de ERA shop y la tarifa de Wompi."""
+    """En mostrador el vendedor asume los cargos. Al por mayor se le suman al cliente."""
     if not pedido.vendedor_id:
         pedido.comision_pct = 0
         pedido.comision_cop = 0
@@ -56,15 +87,25 @@ def aplicar_comision(pedido):
         pedido.estado_comision = "exenta"
         return
     detalle, mayor = porcentajes_comision()
-    pct = mayor if pedido.es_mayor else detalle
-    monto = Decimal(str(pedido.monto_cop or 0))
-    comision = peso(monto * pct / Decimal("100"))
-    tarifa = tarifa_wompi(monto)
-    pedido.comision_pct = pct
-    pedido.comision_cop = comision
-    pedido.tarifa_pasarela_cop = tarifa
-    neto = monto - comision - tarifa
-    pedido.neto_vendedor = neto if neto > 0 else 0
+    if pedido.es_mayor:
+        pct = mayor
+        base = peso(Decimal(str(pedido.subtotal_cop or 0)) + Decimal(str(pedido.iva_cop or 0)))
+        cargos = total_con_cargos(base, pct)
+        pedido.comision_pct = pct
+        pedido.comision_cop = cargos["comision"]
+        pedido.tarifa_pasarela_cop = cargos["tarifa"]
+        pedido.neto_vendedor = cargos["neto"]
+        pedido.monto_cop = cargos["total"]
+    else:
+        pct = detalle
+        monto = Decimal(str(pedido.monto_cop or 0))
+        comision = peso(monto * pct / Decimal("100"))
+        tarifa = tarifa_wompi(monto)
+        pedido.comision_pct = pct
+        pedido.comision_cop = comision
+        pedido.tarifa_pasarela_cop = tarifa
+        neto = monto - comision - tarifa
+        pedido.neto_vendedor = neto if neto > 0 else 0
     if pedido.estado_comision in ("", "exenta"):
         pedido.estado_comision = "por_confirmar"
 

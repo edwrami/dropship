@@ -13,9 +13,9 @@
   </ul>
 {% endif %}
 {% if pedido.es_mayor %}
-  <p>{% if pedido.factura_iva %}Factura con IVA {{ pedido.iva_pct|floatformat:-2 }}%: ${{ pedido.iva_cop|floatformat:0|intcomma }}.{% else %}Factura sin IVA.{% endif %}</p>
-  <p>De este pago, ERA shop retiene {{ pedido.comision_pct|floatformat:-2 }}% (${{ pedido.comision_cop|floatformat:0|intcomma }}) y Wompi cobra ${{ pedido.tarifa_pasarela_cop|floatformat:0|intcomma }}. Al proveedor le quedan ${{ pedido.neto_vendedor|floatformat:0|intcomma }}. Esos descuentos no se suman: salen del pago.</p>
-  <p class="muted">El IVA de Wompi va dentro de su tarifa y no se puede quitar. La factura con IVA o sin IVA es solo el IVA de la mercancía.</p>
+  <p>Mercancía y envío ${{ pedido.subtotal_cop|floatformat:0|intcomma }}. {% if pedido.factura_iva %}IVA de la factura {{ pedido.iva_pct|floatformat:-2 }}% ${{ pedido.iva_cop|floatformat:0|intcomma }}.{% else %}Factura sin IVA.{% endif %}</p>
+  <p>Se suma ERA shop {{ pedido.comision_pct|floatformat:-2 }}% ${{ pedido.comision_cop|floatformat:0|intcomma }} y Wompi ${{ pedido.tarifa_pasarela_cop|floatformat:0|intcomma }}. El total de arriba ya los incluye. Al proveedor le queda ${{ pedido.neto_vendedor|floatformat:0|intcomma }}.</p>
+  <p><a class="btn sec" href="{% url 'bodega_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar para bodega (Word)</a></p>
 {% endif %}
 <p>Referencia <strong>{{ pedido.referencia_pago }}</strong>.</p>
 {% if pedido.modo_envio == "contraentrega" %}

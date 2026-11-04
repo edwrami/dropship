@@ -41,7 +41,7 @@
 
   {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}
     <h3>Tiendas conectadas</h3>
-    <p class="muted">Publica cada producto con precio al por mayor, cantidad mínima y especificaciones. Las fotos son opcionales. El establecimiento suma productos y cantidades, y ese pedido queda guardado. En esa venta el porcentaje es el de al por mayor. El teléfono sigue oculto hasta el pedido.</p>
+    <p class="muted">Publica cada producto con precio al por mayor, cantidad mínima y especificaciones. Las fotos son opcionales. El establecimiento suma productos y cantidades. A ese total se le suman tu porcentaje al por mayor y la tarifa de Wompi. A ti te queda el precio de la lista. El pedido se descarga en Word para bodega. El teléfono sigue oculto hasta el pedido.</p>
     <table>
       <tr><th>Tienda</th><th>Ciudad</th><th>Desde</th></tr>
       {% for c in conexiones %}
@@ -108,7 +108,7 @@
   </table>
 
   <h3>Pedidos</h3>
-  <p class="muted">El pedido es el canal con el cliente. Del precio se descuentan el porcentaje de ERA shop y la tarifa de Wompi. El resto se consigna al Nequi de esta tienda.</p>
+  <p class="muted">El pedido es el canal con el cliente. {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}En la lista al por mayor el establecimiento paga el precio más el porcentaje y Wompi. En mostrador esos cargos salen del precio.{% else %}Del precio se descuentan el porcentaje de ERA shop y la tarifa de Wompi.{% endif %} El resto se consigna al Nequi de esta tienda.</p>
   <table>
     <tr><th>#</th><th>Producto</th><th>Cliente</th><th>Pago</th><th>Venta</th><th>Comisión</th><th>Estado comisión</th><th></th></tr>
     {% for p in pedidos %}

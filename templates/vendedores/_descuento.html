@@ -1,11 +1,20 @@
 {% load l10n %}
 <div class="aviso" id="cuenta-descuento" data-pct="{{ comision_pct|unlocalize }}" data-wompi-pct="{{ wompi_pct|unlocalize }}" data-wompi-fijo="{{ wompi_fijo|unlocalize }}" data-wompi-iva="{{ wompi_iva|unlocalize }}">
+  {% if vendedor_actual and vendedor_actual.tipo != "detallista" %}
+  <p>En la lista al por mayor el establecimiento paga tu precio, más el <strong>{{ comision_mayor_pct|floatformat:-2 }}%</strong> de ERA shop y la tarifa de Wompi. Esos dos cargos se suman al cerrar el pedido. A tu Nequi llega el precio de la lista.</p>
+  <p>En el mostrador el cliente paga un solo precio. De ahí salen el <strong>{{ comision_detalle_pct|floatformat:-2 }}%</strong> y la tarifa de Wompi.</p>
+  {% else %}
   <p>Del precio que paga el cliente se descuentan dos cosas, y las dos las asumes tú:</p>
-  <p>El <strong>{{ comision_pct|floatformat:-2 }}%</strong> se queda en ERA shop.{% if vendedor_actual and vendedor_actual.tipo != "detallista" %} En la lista al por mayor es {{ comision_mayor_pct|floatformat:-2 }}%. En el mostrador, {{ comision_detalle_pct|floatformat:-2 }}%.{% endif %}</p>
+  <p>El <strong>{{ comision_pct|floatformat:-2 }}%</strong> se queda en ERA shop.</p>
   <p>Wompi cobra <strong>{{ wompi_pct }}%</strong> del valor más <strong>${{ wompi_fijo }}</strong>, y el IVA del <strong>{{ wompi_iva }}%</strong> solo sobre esa tarifa.</p>
   <p>Puedes sumar esos cargos al precio o publicar el precio ya con todo incluido. El cliente paga un solo valor. A tu Nequi llega lo que queda.</p>
+  {% endif %}
   <label>Lo que te cuesta el producto<input id="mi-costo" inputmode="numeric" placeholder="Ej. 50000"></label>
+  {% if vendedor_actual and vendedor_actual.tipo != "detallista" %}
+  <p>En la lista puedes publicar desde <strong id="precio-minimo">—</strong>. El establecimiento paga encima el porcentaje y Wompi.</p>
+  {% else %}
   <p>Para no perder, con todo incluido, el precio debe ser al menos <strong id="precio-minimo">—</strong>.</p>
+  {% endif %}
   <button class="btn sec" id="usar-precio" type="button">Usar ese precio en el producto</button>
   <p id="resultado-precio"></p>
 </div>
@@ -53,18 +62,47 @@
     while (cargos(p).neto < base && p < tope) p += 1;
     return p;
   }
+  function sumaCliente(base) {
+    var p = pct / 100;
+    var w = wompiPct / 100;
+    var factor = 1 + iva / 100;
+    var comision = Math.round(base * p);
+    var total = Math.round((base * (1 + p) + fijo * factor) / (1 - w * factor));
+    var tarifa = Math.round((total * w + fijo) * factor);
+    var i;
+    for (i = 0; i < 4; i++) {
+      var ajustado = Math.round(base + comision + tarifa);
+      if (ajustado === total) break;
+      total = ajustado;
+      tarifa = Math.round((total * w + fijo) * factor);
+    }
+    tarifa = Math.round(total - base - comision);
+    return { comision: comision, tarifa: tarifa, total: total };
+  }
   function pintar() {
     var base = leer(costo) || leer(costoCampo);
+    if (mayorCampo) {
+      minimo.textContent = base ? dinero(base) : "—";
+      var precioLista = leer(mayorCampo) || base;
+      if (!precioLista) {
+        resultado.textContent = "Escribe lo que te cuesta, o el precio al por mayor, para ver lo que paga el establecimiento.";
+        return;
+      }
+      var suma = sumaCliente(precioLista);
+      var aviso = base && precioLista < base ? " Te queda menos de lo que te cuesta." : "";
+      resultado.textContent = "Lista " + dinero(precioLista) + ". El establecimiento paga " + dinero(suma.total) + ": ERA shop " + dinero(suma.comision) + " y Wompi " + dinero(suma.tarifa) + ". Te quedan " + dinero(precioLista) + "." + aviso;
+      return;
+    }
     var minimoValor = base ? minimoPara(base) : 0;
     minimo.textContent = minimoValor ? dinero(minimoValor) : "—";
-    var precio = leer(promoCampo) || leer(mayorCampo) || leer(precioCampo) || minimoValor;
+    var precio = leer(promoCampo) || leer(precioCampo) || minimoValor;
     if (!precio) {
       resultado.textContent = "Escribe lo que te cuesta, o el precio del producto, para ver los descuentos.";
       return;
     }
     var cuenta = cargos(precio);
-    var aviso = base && cuenta.neto < base ? " Con este precio te queda menos de lo que te cuesta." : "";
-    resultado.textContent = "A " + dinero(precio) + ": ERA shop " + dinero(cuenta.comision) + ", Wompi " + dinero(cuenta.tarifa) + ", te quedan " + dinero(cuenta.neto) + "." + aviso;
+    var corto = base && cuenta.neto < base ? " Con este precio te queda menos de lo que te cuesta." : "";
+    resultado.textContent = "A " + dinero(precio) + ": ERA shop " + dinero(cuenta.comision) + ", Wompi " + dinero(cuenta.tarifa) + ", te quedan " + dinero(cuenta.neto) + "." + corto;
   }
   costo.addEventListener("input", pintar);
   if (precioCampo) precioCampo.addEventListener("input", pintar);
@@ -76,7 +114,7 @@
   usar.addEventListener("click", function () {
     var base = leer(costo) || leer(costoCampo);
     if (!base || !destino) return;
-    destino.value = String(minimoPara(base));
+    destino.value = String(mayorCampo ? base : minimoPara(base));
     destino.dispatchEvent(new Event("input"));
     pintar();
   });

@@ -11,7 +11,7 @@
         <li>{{ l.titulo }} · {{ l.cantidad }} × ${{ l.precio_unitario|floatformat:0|intcomma }}{% if l.envio_cop %} · envío ${{ l.envio_cop|floatformat:0|intcomma }}{% endif %}</li>
       {% endfor %}
     </ul>
-    <p>{% if pedido.factura_iva %}Factura con IVA ${{ pedido.iva_cop|floatformat:0|intcomma }}.{% else %}Factura sin IVA.{% endif %} ERA shop retiene {{ pedido.comision_pct|floatformat:-2 }}% (${{ pedido.comision_cop|floatformat:0|intcomma }}). Wompi ${{ pedido.tarifa_pasarela_cop|floatformat:0|intcomma }}.</p>
+    <p>{% if pedido.factura_iva %}Factura con IVA ${{ pedido.iva_cop|floatformat:0|intcomma }}.{% else %}Factura sin IVA.{% endif %} Se suman ERA shop {{ pedido.comision_pct|floatformat:-2 }}% (${{ pedido.comision_cop|floatformat:0|intcomma }}) y Wompi ${{ pedido.tarifa_pasarela_cop|floatformat:0|intcomma }}. Al proveedor le queda ${{ pedido.neto_vendedor|floatformat:0|intcomma }}.</p>
   {% endif %}
   <p class="meta">Pago: {{ pedido.get_estado_pago_display }} · Pedido: {{ pedido.get_estado_display }}{% if pedido.tracking %} · Guía {{ pedido.tracking }}{% endif %}</p>
   {% if pedido.pago %}
@@ -25,6 +25,7 @@
   {% endif %}
   <p class="note">Esta conversación es el canal. Las dudas, la entrega y el estado se hablan aquí, no por fuera.</p>
   <p><a class="btn sec" href="{% url 'resumen_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar resumen</a>
+    {% if pedido.es_mayor %}<a class="btn" href="{% url 'bodega_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar para bodega (Word)</a>{% endif %}
     {% if rol == "cliente" %}<a class="btn sec" href="{% url 'historial_comprador' %}">Ver mi historial</a>{% endif %}
   </p>
 
