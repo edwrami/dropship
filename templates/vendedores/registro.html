@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Registro para vender · ERA shop{% endblock %}
 {% block content %}
-  {% if modo == "mayorista" or modo == "importador" %}
+  {% if modo == "mayorista" or modo == "importador" or modo == "fabricante" %}
     <h2>Vender al por mayor</h2>
-    <p class="muted">Registra al mayorista o al importador con todos sus datos. Después publicas la lista: precio, cantidad mínima y especificaciones. Las fotos son opcionales.</p>
+    <p class="muted">Registra al fabricante, al mayorista o al importador. Publicas al detal, como cualquier tienda, y además la lista al por mayor: precio, cantidad mínima y especificaciones. Las fotos son opcionales.</p>
   {% elif next %}
     <h2>Antes de publicar, registra quién vende</h2>
-    <p class="muted">Persona, tienda física, tienda virtual, mayorista o importador. Completa todo. Al terminar se abre la ficha del producto.</p>
+    <p class="muted">Persona, tienda física, tienda virtual, fabricante, mayorista o importador. Completa todo. Al terminar se abre la ficha del producto.</p>
   {% else %}
     <h2>Registro para vender</h2>
-    <p class="muted">Sirve para una persona, una tienda física, una tienda virtual, un mayorista o un importador.</p>
+    <p class="muted">Sirve para una persona, una tienda física, una tienda virtual, un fabricante, un mayorista o un importador. Esos tres últimos también venden al detal.</p>
   {% endif %}
   {% if otra_cuenta %}
     <div class="error">Esta sesión es de otra cuenta. Al crear el registro entras con el correo nuevo.</div>

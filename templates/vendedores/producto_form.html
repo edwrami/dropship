@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <h2>{% if producto %}Editar producto{% else %}Publicar producto{% endif %}</h2>
-  <p class="muted">Completa toda la ficha: nombre, descripción, categoría, ciudad de despacho, precio, entrega y envío. Las fotos son opcionales.{% if vendedor_actual and vendedor_actual.tipo == "mayorista" or vendedor_actual and vendedor_actual.tipo == "importador" %} Como mayorista o importador también van el precio al por mayor y la cantidad mínima.{% endif %}</p>
+  <p class="muted">Completa toda la ficha: nombre, descripción, categoría, ciudad de despacho, precio, entrega y envío. Las fotos son opcionales. El precio normal es al detal y queda en el catálogo y en tu tienda.{% if vendedor_actual.es_proveedor %} Como fabricante, mayorista o importador también van el precio al por mayor y la cantidad mínima. Ese precio solo lo ve el establecimiento conectado.{% endif %}</p>
   {% include "vendedores/_descuento.html" %}
   <form method="post" enctype="multipart/form-data" style="max-width:720px">{% csrf_token %}
     {{ form.as_p }}

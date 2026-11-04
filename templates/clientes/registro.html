@@ -2,7 +2,7 @@
 {% block title %}Registro de tienda · ERA shop{% endblock %}
 {% block content %}
   <h2>Registro del establecimiento</h2>
-  <p class="muted">Para pedir en las listas de mayoristas e importadores hace falta este registro completo. Los datos quedan en ERA shop y se copian en cada pedido para el proveedor.</p>
+  <p class="muted">Para pedir en las listas de fabricantes, mayoristas e importadores hace falta este registro completo. Los datos quedan en ERA shop y se copian en cada pedido para el proveedor.</p>
   <form method="post" style="max-width:720px">{% csrf_token %}
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     {{ form.as_p }}

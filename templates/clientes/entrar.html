@@ -2,7 +2,7 @@
 {% block title %}Entrar como tienda · ERA shop{% endblock %}
 {% block content %}
   <h2>Entrar como establecimiento</h2>
-  <p class="muted">Esta entrada es para establecimientos que piden en las listas de mayoristas e importadores.</p>
+  <p class="muted">Esta entrada es para establecimientos que piden en las listas de fabricantes, mayoristas e importadores.</p>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   <form method="post" style="max-width:420px">{% csrf_token %}
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}

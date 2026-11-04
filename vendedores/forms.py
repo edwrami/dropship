@@ -28,7 +28,7 @@ class RegistroForm(forms.Form):
     nombre_tienda = forms.CharField(
         label="Nombre de la tienda o de quien vende",
         max_length=160,
-        help_text="Sirve para una tienda física, una tienda virtual, una persona, un mayorista o un importador.",
+        help_text="Sirve para una persona, una tienda física, una tienda virtual, un fabricante, un mayorista o un importador.",
     )
     responsable = forms.CharField(label="Responsable", max_length=200)
     documento = forms.CharField(label="Cédula o NIT", max_length=40)
@@ -52,7 +52,7 @@ class RegistroForm(forms.Form):
     tipo = forms.ChoiceField(
         label="Quién vende",
         choices=TIPOS,
-        help_text="Persona, tienda física, tienda virtual, mayorista o importador. Cada uno publica lo que le corresponde.",
+        help_text="Persona, tienda física, tienda virtual, fabricante, mayorista o importador. El fabricante, el mayorista y el importador también venden al detal.",
     )
     rango_precio = forms.ChoiceField(
         label="Rango de precios de tu mercancía",
@@ -112,7 +112,7 @@ class DatosVendedorForm(forms.Form):
     tipo = forms.ChoiceField(
         label="Quién vende",
         choices=TIPOS,
-        help_text="Mayorista e importador publican lista al por mayor. Persona y tienda virtual no necesitan local.",
+        help_text="Fabricante, mayorista e importador publican lista al por mayor y también venden al detal. Persona y tienda virtual no necesitan local.",
     )
     frase = forms.CharField(
         label="Qué vendes",
@@ -185,11 +185,11 @@ class ProductoVendedorForm(forms.ModelForm):
         help_texts = {
             "descripcion": "Qué es, materiales, medidas, qué incluye y cómo se usa. Mínimo 80 caracteres.",
             "stock": "Déjalo vacío para publicar sin límite de unidades.",
-            "precio_final_cop": "Puede ir ya con el porcentaje de ERA shop y la tarifa de Wompi incluidos.",
+            "precio_final_cop": "Precio al detal. Lo ve cualquiera en el catálogo y en tu tienda, igual que en una tienda física o virtual. Puede ir ya con el porcentaje de ERA shop y la tarifa de Wompi incluidos.",
             "precio_promo_cop": "Opcional. Menor que el precio normal. El cliente paga este valor mientras la promoción esté vigente. El porcentaje de ERA shop y Wompi se calculan sobre él.",
             "promo_hasta": "Opcional. Si la dejas vacía, la promoción sigue hasta que la quites.",
             "precio_costo": "El cliente no ve este valor. Sirve para avisarte si el precio te deja pérdida.",
-            "precio_mayor_cop": "Solo lo ven las tiendas conectadas contigo. El catálogo público sigue mostrando el precio de mostrador.",
+            "precio_mayor_cop": "Solo lo ve el establecimiento conectado. El catálogo y tu tienda siguen vendiendo al detal con el precio normal.",
             "unidad_empaque": "Por ejemplo: caja x 12, docena, bulto.",
             "modo_envio": "Si el precio ya incluye el envío, elige esa opción. Si se cobra aparte, escribe el valor. Si el cliente paga el envío al recibirlo, elige contraentrega: ese valor no entra en el pago de la página.",
             "costo_envio_cop": "Solo si el envío se cobra aparte. En precio con envío o contraentrega déjalo en 0.",

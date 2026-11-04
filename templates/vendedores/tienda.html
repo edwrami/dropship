@@ -16,6 +16,7 @@
     <p class="eyebrow">{{ tienda.get_tipo_display }} · {{ tienda.ciudad }}</p>
     <h1>{{ tienda.nombre_tienda }}</h1>
     <p class="lede">{% if tienda.frase %}{{ tienda.frase }}{% else %}Elige un producto y pide. La conversación queda dentro del pedido.{% endif %}</p>
+    {% if tienda.es_proveedor %}<p class="meta">Los precios de esta página son al detal. El establecimiento conectado ve, aparte, la lista al por mayor.</p>{% endif %}
     {% if tienda.horario %}<p class="meta">Despacho: {{ tienda.horario }}</p>{% endif %}
     <p class="meta">{{ tienda.visitas|intcomma }} visitas</p>
     <p class="meta">{% if nota_publica %}{{ nota_publica|floatformat:1 }} de 5{% else %}Sin calificación todavía{% endif %}{% if total_calificaciones %} · {{ total_calificaciones }} comentarios{% endif %}</p>

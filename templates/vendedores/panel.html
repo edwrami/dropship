@@ -4,8 +4,8 @@
   <h2>{{ vendedor.nombre_tienda }}</h2>
   {% if vendedor.tipo == "virtual" or vendedor.tipo == "persona" or vendedor.tipo == "dropshipper" %}
     <p class="muted">Vendes sin local. La ciudad es desde donde despachas. Publicar producto abre la ficha completa.</p>
-  {% elif vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}
-    <p class="muted">Publicas lista al por mayor. Cada producto lleva precio de mostrador, precio al por mayor y cantidad mínima.</p>
+  {% elif vendedor.es_proveedor %}
+    <p class="muted">Vendes al detal en el catálogo y en tu tienda, con el precio normal, igual que una tienda física o virtual. Además publicas lista al por mayor: precio de mostrador, precio al por mayor y cantidad mínima.</p>
   {% endif %}
   {% if vendedor.slug %}
     <p class="muted">Publica la tienda. Quien pulse el enlace llega al catálogo de tu mercancía para pedir.</p>
@@ -33,7 +33,7 @@
     <p><strong>Categorías:</strong>
       {% for c in vendedor.categorias.all %}{{ c.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}Ninguna{% endfor %}
     </p>
-    <p><strong>Comisión por pedido:</strong> {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}{{ comision_mayor_pct|floatformat:-2 }}% al por mayor · {{ comision_detalle_pct|floatformat:-2 }}% en mostrador{% else %}{{ comision_detalle_pct|floatformat:-2 }}%{% endif %} · plazo {{ dias_liquidacion }} días después del pago del cliente.</p>
+    <p><strong>Comisión por pedido:</strong> {% if vendedor.es_proveedor %}{{ comision_mayor_pct|floatformat:-2 }}% al por mayor · {{ comision_detalle_pct|floatformat:-2 }}% en el detal{% else %}{{ comision_detalle_pct|floatformat:-2 }}%{% endif %} · plazo {{ dias_liquidacion }} días después del pago del cliente.</p>
     <p><strong>Visitas de tu página:</strong> {{ vendedor.visitas }}</p>
     <p><strong>Calificación pública:</strong> {% if nota_publica %}{{ nota_publica|floatformat:1 }} de 5{% else %}Sin calificación todavía{% endif %}{% if total_notas %} · {{ total_notas }} comentarios{% endif %}</p>
     <p><strong>Por liquidar ahora:</strong> ${{ deuda }} COP</p>
@@ -47,9 +47,9 @@
     <a class="btn sec" href="{% url 'liquidar_comision' %}">Liquidar comisión</a>
   </div>
 
-  {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}
+  {% if vendedor.es_proveedor %}
     <h3>Tiendas conectadas</h3>
-    <p class="muted">Publica cada producto con precio al por mayor, cantidad mínima y especificaciones. Las fotos son opcionales. El establecimiento suma productos y cantidades. A ese total se le suman tu porcentaje al por mayor y la tarifa de Wompi. A ti te queda el precio de la lista. El pedido se descarga en Word para bodega. El teléfono aparece para el cliente cuando la transferencia queda aprobada.</p>
+    <p class="muted">El precio normal se vende al detal en el catálogo y en tu tienda, como cualquier vendedor. La lista al por mayor lleva su precio, la cantidad mínima y las especificaciones. Las fotos son opcionales. El establecimiento suma productos y cantidades. A ese total se le suman tu porcentaje al por mayor y la tarifa de Wompi. A ti te queda el precio de la lista. El pedido se descarga en Word para bodega. El teléfono aparece para el cliente cuando la transferencia queda aprobada.</p>
     <table>
       <tr><th>Tienda</th><th>Ciudad</th><th>Desde</th></tr>
       {% for c in conexiones %}
@@ -144,7 +144,7 @@
   </table>
 
   <h3>Pedidos</h3>
-  <p class="muted">El pedido es el canal con el cliente. {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}En la lista al por mayor el establecimiento paga el precio más el porcentaje y Wompi. En mostrador esos cargos salen del precio.{% else %}Del precio se descuentan el porcentaje de ERA shop y la tarifa de Wompi.{% endif %} El resto se consigna al Nequi de esta tienda.</p>
+  <p class="muted">El pedido es el canal con el cliente. {% if vendedor.es_proveedor %}En la lista al por mayor el establecimiento paga el precio más el porcentaje y Wompi. En el detal, igual que cualquier tienda, esos cargos salen del precio.{% else %}Del precio se descuentan el porcentaje de ERA shop y la tarifa de Wompi.{% endif %} El resto se consigna al Nequi de esta tienda.</p>
   <table>
     <tr><th>#</th><th>Producto</th><th>Cliente</th><th>Pago</th><th>Venta</th><th>Comisión</th><th>Estado comisión</th><th></th></tr>
     {% for p in pedidos %}

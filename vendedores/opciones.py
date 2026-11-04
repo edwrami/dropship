@@ -9,7 +9,7 @@ DEPARTAMENTOS = [
 
 DEPARTAMENTOS_CHOICES = [("", "Selecciona")] + [(d, d) for d in DEPARTAMENTOS]
 
-TIPOS_PROVEEDOR = ("mayorista", "importador")
+TIPOS_PROVEEDOR = ("fabricante", "mayorista", "importador")
 
 TIPOS = [
     ("persona", "Persona"),

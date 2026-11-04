@@ -13,7 +13,7 @@ def pagina_legal(request, slug):
         "terminos": {
             "titulo": "Términos de ERA shop",
             "parrafos": [
-                "ERA shop es la página donde una persona, una tienda física, una tienda virtual, un mayorista o un importador publica mercancía, y donde un comprador o un establecimiento la pide.",
+                "ERA shop es la página donde una persona, una tienda física, una tienda virtual, un fabricante, un mayorista o un importador publica mercancía, y donde un comprador o un establecimiento la pide. El fabricante, el mayorista y el importador venden al detal en su tienda y, además, publican lista al por mayor.",
                 "El pago del cliente entra por la página. No se paga por fuera. Cuando la transferencia queda aprobada, el pedido queda registrado y ahí aparece el contacto de quien vende.",
                 "En una compra al detal, quien compra paga el precio publicado. De ese valor se descuentan el porcentaje vigente de ERA shop y la tarifa de la pasarela. Quien vende recibe el resto. El porcentaje se muestra al registrarse y puede cambiar para las ventas nuevas.",
                 "En una compra al por mayor, el establecimiento paga el precio de la lista, el IVA si pidió factura con IVA, el porcentaje vigente de ERA shop y la tarifa de la pasarela. Quien vende recibe el precio de la lista.",

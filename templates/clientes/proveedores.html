@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Mayoristas e importadores · ERA shop{% endblock %}
+{% block title %}Fabricantes, mayoristas e importadores · ERA shop{% endblock %}
 {% block content %}
   <p class="kicker">Comprar al por mayor</p>
-  <h2>Mayoristas e importadores</h2>
+  <h2>Fabricantes, mayoristas e importadores</h2>
   {% if cliente_actual %}
     <p class="lede">Conéctate y abre la lista: precio, especificaciones y fotos si el proveedor las publicó. El pedido se arma sumando cantidades.</p>
   {% elif vendedor_actual %}
     <p class="lede">Estas son las listas al por mayor. Para pedirlas, el establecimiento se registra con su propio correo. Tu cuenta publica mercancía; no arma pedidos de establecimiento.</p>
   {% elif comprador_actual %}
-    <p class="lede">Tu cuenta compra al detal. Para ver precios de mayorista e importador, registra el establecimiento con sus datos.</p>
+    <p class="lede">Tu cuenta compra al detal. Para ver precios de fabricante, mayorista e importador, registra el establecimiento con sus datos.</p>
     <p><a class="btn" href="{% url 'registro_cliente' %}">Registrar el establecimiento</a></p>
   {% else %}
     <p class="lede">Registra el establecimiento con todos sus datos, conéctate y abre la lista: precio, especificaciones y fotos si el proveedor las publicó.</p>
@@ -17,7 +17,8 @@
   <form class="filters-grid filters" method="get">
     <label>Tipo
       <select name="tipo">
-        <option value="">Mayoristas e importadores</option>
+        <option value="">Fabricantes, mayoristas e importadores</option>
+        <option value="fabricante" {% if tipo == "fabricante" %}selected{% endif %}>Fabricante</option>
         <option value="mayorista" {% if tipo == "mayorista" %}selected{% endif %}>Mayorista</option>
         <option value="importador" {% if tipo == "importador" %}selected{% endif %}>Importador</option>
       </select>
@@ -50,7 +51,7 @@
         </div>
       </article>
     {% empty %}
-      <p>Todavía no hay mayoristas ni importadores activos con esta búsqueda.</p>
+      <p>Todavía no hay fabricantes, mayoristas ni importadores activos con esta búsqueda.</p>
     {% endfor %}
   </div>
 {% endblock %}

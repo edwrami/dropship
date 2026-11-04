@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
-from .opciones import DEPARTAMENTOS_CHOICES, RANGOS, TIPOS
+from .opciones import DEPARTAMENTOS_CHOICES, RANGOS, TIPOS, TIPOS_PROVEEDOR
 
 
 class Categoria(models.Model):
@@ -93,7 +93,7 @@ class Vendedor(models.Model):
 
     @property
     def es_proveedor(self):
-        return self.estado == "activo" and self.tipo in ("mayorista", "importador")
+        return self.estado == "activo" and self.tipo in TIPOS_PROVEEDOR
 
 
 class ClienteTienda(models.Model):

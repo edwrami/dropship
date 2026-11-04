@@ -7,7 +7,7 @@
   <p class="muted">Proveedores con los que estás conectado. Abre cada lista para ver precios, fotos y especificaciones.</p>
   <h3>Datos del establecimiento</h3>
   {% if not cliente_completo %}<div class="error">Completa nombre, responsable, cédula o NIT, teléfono, dirección y ciudad antes de pedir.</div>{% endif %}
-  <p class="muted">Estos datos quedan en ERA shop y se copian en cada pedido al mayorista o importador.</p>
+  <p class="muted">Estos datos quedan en ERA shop y se copian en cada pedido al fabricante, mayorista o importador.</p>
   <form method="post" style="max-width:720px">{% csrf_token %}
     {{ form.as_p }}
     <button class="btn" type="submit">Guardar datos</button>
@@ -31,7 +31,7 @@
   <h3 id="historial">Historial de compras</h3>
   <p class="muted">Aquí está todo lo que has pedido con esta cuenta, con este correo o desde este navegador. La conversación con la tienda sigue dentro de cada pedido.</p>
   {% include "clientes/_historial.html" %}
-  <p><a class="btn" href="{% url 'proveedores_mayor' %}">Buscar mayoristas e importadores</a></p>
+  <p><a class="btn" href="{% url 'proveedores_mayor' %}">Buscar fabricantes, mayoristas e importadores</a></p>
   <div class="catalog">
     {% for c in conexiones %}
       <article class="product">

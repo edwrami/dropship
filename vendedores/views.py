@@ -20,7 +20,7 @@ from productos.models import FotoProducto, Producto
 from productos.services.storage import borrar_foto, extension, subir_foto
 
 from .forms import DatosVendedorForm, ProductoVendedorForm, RegistroForm
-from .opciones import DEPARTAMENTOS, TIPOS
+from .opciones import DEPARTAMENTOS, TIPOS, TIPOS_PROVEEDOR
 from .models import Categoria, Vendedor
 from .services import (
     aplicar_sanciones,
@@ -283,7 +283,7 @@ def producto_form(request, pk=None):
     form = ProductoVendedorForm(
         request.POST or None,
         instance=instancia,
-        mayorista=vendedor.tipo in ("mayorista", "importador"),
+        mayorista=vendedor.tipo in TIPOS_PROVEEDOR,
     )
     archivos = request.FILES.getlist("fotos") if request.method == "POST" else []
     if request.method == "POST" and form.is_valid():

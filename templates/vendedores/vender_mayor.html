@@ -2,10 +2,10 @@
 {% block title %}Vender al por mayor · ERA shop{% endblock %}
 {% block content %}
   <h2>Vender al por mayor</h2>
-  <p>{{ vendedor.nombre_tienda }} está como {{ vendedor.get_tipo_display }}. La lista de precios al por mayor la publican el mayorista y el importador.</p>
-  <p>En la clasificación elige Mayorista o Importador. Desde ahí, Publicar producto pide el precio al por mayor, la cantidad mínima y la ficha. El mostrador sigue siendo el precio que ve el público.</p>
+  <p>{{ vendedor.nombre_tienda }} está como {{ vendedor.get_tipo_display }}. La lista de precios al por mayor la publican el fabricante, el mayorista y el importador.</p>
+  <p>En la clasificación elige Fabricante, Mayorista o Importador. Desde ahí, Publicar producto pide el precio al detal, el precio al por mayor y la cantidad mínima. El precio al detal es el que ve cualquiera en tu tienda.</p>
   <p>
-    <a class="btn" href="{% url 'datos_vendedor' %}">Cambiar a mayorista o importador</a>
+    <a class="btn" href="{% url 'datos_vendedor' %}">Cambiar a fabricante, mayorista o importador</a>
     <a class="btn sec" href="{% url 'nuevo_producto' %}">Publicar producto</a>
   </p>
 {% endblock %}

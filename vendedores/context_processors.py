@@ -4,6 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from pedidos.models import Aviso, CuentaPlataforma
 
 from .models import CarritoCompradorLinea, CarritoLinea
+from .opciones import TIPOS_PROVEEDOR
 
 
 def marketplace(request):
@@ -27,7 +28,7 @@ def marketplace(request):
     cuenta = CuentaPlataforma.objects.filter(pk=1).first()
     detalle = cuenta.comision_detalle_pct if cuenta is not None else getattr(settings, "COMISION_PCT", 10)
     mayor = cuenta.comision_mayor_pct if cuenta is not None else getattr(settings, "COMISION_MAYOR_PCT", 5)
-    pct = mayor if vendedor is not None and vendedor.tipo in ("mayorista", "importador") else detalle
+    pct = mayor if vendedor is not None and vendedor.tipo in TIPOS_PROVEEDOR else detalle
     pedido_armado = 0
     if cliente is not None:
         pedido_armado = CarritoLinea.objects.filter(carrito__cliente=cliente).count()

@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 
 from productos.models import Producto
 from vendedores.forms import _nequi_valido
-from vendedores.opciones import TIPOS
+from vendedores.opciones import TIPOS, TIPOS_PROVEEDOR
 from vendedores.services import aplicar_comision
 
 from .avisos import avisar_estado, avisar_mensaje, avisar_pago, avisar_pedido_nuevo, avisar_stock_bajo
@@ -937,7 +937,7 @@ def _registro_ventas(request):
             qs = qs | Pedido.objects.filter(pk=int(q))
     tipo = request.GET.get("tipo") or ""
     if tipo == "minorista":
-        qs = qs.exclude(vendedor__tipo__in=("mayorista", "importador"))
+        qs = qs.exclude(vendedor__tipo__in=TIPOS_PROVEEDOR)
     elif tipo:
         qs = qs.filter(vendedor__tipo=tipo)
     for campo, nombre in (

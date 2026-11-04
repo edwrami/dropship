@@ -3,8 +3,8 @@
 {% block content %}
   <h2>Cargar lista al por mayor</h2>
   {% if not puede %}
-    <p>{{ vendedor.nombre_tienda }} está como {{ vendedor.get_tipo_display }}. La carga del archivo es para mayorista e importador.</p>
-    <p><a class="btn" href="{% url 'datos_vendedor' %}">Cambiar a mayorista o importador</a></p>
+    <p>{{ vendedor.nombre_tienda }} está como {{ vendedor.get_tipo_display }}. La carga del archivo es para fabricante, mayorista e importador.</p>
+    <p><a class="btn" href="{% url 'datos_vendedor' %}">Cambiar a fabricante, mayorista o importador</a></p>
   {% else %}
     <p class="muted">Un archivo CSV, hasta 200 filas. La categoría tiene que existir ya en ERA shop, escrita igual. El envío es incluido, aparte o contraentrega. Si el stock va vacío, el producto queda sin límite. Las fotos se agregan después, una por una, si las quieres.</p>
     <p><a href="{% url 'cargar_lista' %}?ejemplo=1">Descargar un ejemplo</a></p>

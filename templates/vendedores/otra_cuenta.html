@@ -3,10 +3,10 @@
 {% block content %}
   {% if para == "mayor" %}
     <h2>Vender al por mayor</h2>
-    <p>Esta cuenta no publica mercancía. Para vender al por mayor, el mayorista o el importador se registra con su propio correo.</p>
+    <p>Esta cuenta no publica mercancía. Para vender al por mayor, el fabricante, el mayorista o el importador se registra con su propio correo. Esa cuenta también vende al detal.</p>
   {% else %}
     <h2>Publicar producto</h2>
-    <p>Esta cuenta no publica productos. Para publicar, quien vende se registra con su correo: persona, tienda física, tienda virtual, mayorista o importador.</p>
+    <p>Esta cuenta no publica productos. Para publicar, quien vende se registra con su correo: persona, tienda física, tienda virtual, fabricante, mayorista o importador.</p>
   {% endif %}
   <p><a class="btn" href="{% url 'salir_vendedor' %}">Salir y usar el registro</a></p>
 {% endblock %}
