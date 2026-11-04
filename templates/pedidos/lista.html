@@ -23,6 +23,14 @@
   </div>
 
   <form method="post" class="card" style="max-width:520px">{% csrf_token %}
+    <input type="hidden" name="accion" value="porcentajes">
+    <p>Estos porcentajes se descuentan en cada venta nueva. Se ven en la tienda, en la calculadora y en el pedido del establecimiento. Lo ya cobrado no cambia.</p>
+    <label>Mostrador (%)<input name="detalle" inputmode="decimal" value="{{ comision_detalle_pct|floatformat:-2 }}" required></label>
+    <label>Al por mayor (%)<input name="mayor" inputmode="decimal" value="{{ comision_mayor_pct|floatformat:-2 }}" required></label>
+    <button class="btn" type="submit">Guardar porcentajes</button>
+  </form>
+
+  <form method="post" class="card" style="max-width:520px">{% csrf_token %}
     <input type="hidden" name="accion" value="nequi">
     <p>Este Nequi es solo para la comisión que te consignan las tiendas. El pago del cliente no entra aquí: entra por la página.</p>
     <label>Titular<input name="titular" value="{{ titular }}"></label>
@@ -42,7 +50,7 @@
 
   <form method="post" class="card" style="max-width:520px">{% csrf_token %}
     <input type="hidden" name="accion" value="payouts">
-    <p>Para girar el 90% al Nequi del vendedor, activa Pagos a terceros en Wompi y pega aquí la API Key y el ID de usuario principal. El 10% se queda en ERA shop.</p>
+    <p>Para girar el restante al Nequi del vendedor, activa Pagos a terceros en Wompi y pega aquí la API Key y el ID de usuario principal. En ERA shop se queda el {{ comision_detalle_pct|floatformat:-2 }}% del mostrador o el {{ comision_mayor_pct|floatformat:-2 }}% del por mayor.</p>
     <label>API Key de Pagos a terceros<input name="payouts_api_key" type="password" autocomplete="off"></label>
     <label>ID de usuario principal<input name="payouts_user_id" autocomplete="off"></label>
     <button class="btn" type="submit">Guardar giro a vendedores</button>
@@ -51,10 +59,10 @@
   {% if por_pagar %}
   <section class="card">
     <h3>Págales el restante a mano</h3>
-    <p>El dinero del cliente entra a tu Wompi. Tú te quedas con el 10%. La tarifa de Wompi ya salió de la venta y la asume el vendedor. Le consignas el restante. Cuando lo hagas, regístralo aquí.</p>
+    <p>El dinero del cliente entra a tu Wompi. Tú te quedas con el porcentaje de esa venta. La tarifa de Wompi ya salió y la asume el vendedor. Le consignas el restante. Cuando lo hagas, regístralo aquí.</p>
     {% for p in por_pagar %}
       <div class="note" style="margin:12px 0">
-        <p><strong>Pedido #{{ p.id }}</strong> · {{ p.producto.titulo|truncatechars:48 }}</p>
+        <p><strong>Pedido #{{ p.id }}</strong> · {% if p.lineas.all %}{{ p.lineas.all|length }} productos{% else %}{{ p.producto.titulo|truncatechars:48 }}{% endif %}</p>
         <p>Venta ${{ p.monto_cop|floatformat:0|intcomma }} · te quedas ${{ p.comision_cop|floatformat:0|intcomma }}{% if p.tarifa_pasarela_cop %} · Wompi ${{ p.tarifa_pasarela_cop|floatformat:0|intcomma }}{% endif %} · le giras ${{ p.neto_vendedor|floatformat:0|intcomma }}</p>
         <p>{{ p.vendedor.nombre_tienda }} · {{ p.vendedor.responsable }} · cédula {{ p.vendedor.documento }}</p>
         {% if p.vendedor.nequi %}
@@ -145,7 +153,7 @@
           {% if p.estado == "entregado" and p.entrega_recibio %}<br>Entregado a {{ p.entrega_recibio }}{% endif %}
           </small>
         </td>
-        <td>{{ p.producto.titulo|truncatechars:40 }}{% if p.variante %}<br><small>{{ p.variante }}</small>{% endif %}</td>
+        <td>{% if p.lineas.all %}{{ p.lineas.all|length }} productos{% if p.factura_iva %} · con IVA{% elif p.es_mayor %} · sin IVA{% endif %}{% else %}{{ p.producto.titulo|truncatechars:40 }}{% if p.variante %}<br><small>{{ p.variante }}</small>{% endif %}{% endif %}</td>
         <td>{{ p.cantidad }}</td>
         <td>${{ p.monto_cop|floatformat:0|intcomma }}</td>
         <td>

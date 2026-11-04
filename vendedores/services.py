@@ -12,18 +12,42 @@ from productos.models import Producto
 from .opciones import banda_precio
 
 
+def peso(valor):
+    return Decimal(str(valor or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+
+def porcentajes_comision():
+    """Los porcentajes vivos los define el dueño. Cada pedido guarda el que usó."""
+    from pedidos.models import CuentaPlataforma
+
+    cuenta = CuentaPlataforma.objects.filter(pk=1).first()
+    detalle = Decimal(str(getattr(settings, "COMISION_PCT", 10)))
+    mayor = Decimal(str(getattr(settings, "COMISION_MAYOR_PCT", 5)))
+    if cuenta is not None:
+        detalle = Decimal(str(cuenta.comision_detalle_pct))
+        mayor = Decimal(str(cuenta.comision_mayor_pct))
+    return detalle, mayor
+
+
 def tarifa_wompi(monto):
-    """2,65% + $700, y el IVA del 19% solo sobre esa tarifa."""
+    """2,65% + $700, y el IVA del 19% solo sobre esa tarifa. Wompi no permite quitarlo."""
     monto = Decimal(str(monto or 0))
     pct = Decimal(str(getattr(settings, "WOMPI_PCT", "2.65")))
     fijo = Decimal(str(getattr(settings, "WOMPI_FIJO_COP", 700)))
     iva = Decimal(str(getattr(settings, "WOMPI_IVA_PCT", 19)))
     base = monto * pct / Decimal("100") + fijo
-    return (base * (Decimal("1") + iva / Decimal("100"))).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return peso(base * (Decimal("1") + iva / Decimal("100")))
+
+
+def iva_mercancia(base, con_iva):
+    if not con_iva:
+        return Decimal("0"), Decimal("0")
+    pct = (Decimal(str(getattr(settings, "IVA_COLOMBIA", "0.19"))) * Decimal("100")).quantize(Decimal("0.01"))
+    return pct, peso(Decimal(str(base or 0)) * pct / Decimal("100"))
 
 
 def aplicar_comision(pedido):
-    """El vendedor asume el 10% de ERA shop y la tarifa de Wompi."""
+    """El vendedor asume el porcentaje de ERA shop y la tarifa de Wompi."""
     if not pedido.vendedor_id:
         pedido.comision_pct = 0
         pedido.comision_cop = 0
@@ -31,9 +55,10 @@ def aplicar_comision(pedido):
         pedido.neto_vendedor = pedido.monto_cop or 0
         pedido.estado_comision = "exenta"
         return
-    pct = Decimal(str(settings.COMISION_PCT))
+    detalle, mayor = porcentajes_comision()
+    pct = mayor if pedido.es_mayor else detalle
     monto = Decimal(str(pedido.monto_cop or 0))
-    comision = (monto * pct / Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    comision = peso(monto * pct / Decimal("100"))
     tarifa = tarifa_wompi(monto)
     pedido.comision_pct = pct
     pedido.comision_cop = comision
@@ -102,7 +127,7 @@ def aplicar_sanciones():
         if pedido.vendedor_id in ya or pedido.vendedor.estado == "expulsado":
             ya.add(pedido.vendedor_id)
             continue
-        pct = getattr(settings, "COMISION_PCT", 10)
+        pct = pedido.comision_pct or getattr(settings, "COMISION_PCT", 10)
         expulsar_vendedor(
             pedido.vendedor,
             f"No liquidó la comisión del {pct}% del pedido #{pedido.id}. "
@@ -114,6 +139,14 @@ def aplicar_sanciones():
 
 
 def devolver_stock(pedido):
+    lineas = list(pedido.lineas.all()) if pedido.pk else []
+    if lineas:
+        for linea in lineas:
+            if linea.producto_id and linea.cantidad:
+                Producto.objects.filter(pk=linea.producto_id, controla_stock=True).update(
+                    stock=F("stock") + linea.cantidad
+                )
+        return
     if not pedido.producto_id or not pedido.cantidad:
         return
     Producto.objects.filter(pk=pedido.producto_id, controla_stock=True).update(
@@ -154,7 +187,7 @@ def cancelar_pedido_vendedor(pedido, vendedor, acepta_sancion):
         pedido.notas = f"{pedido.notas}\n{nota}".strip() if pedido.notas else nota
         pedido.save()
         devolver_stock(pedido)
-        pct = getattr(settings, "COMISION_PCT", 10)
+        pct = pedido.comision_pct or getattr(settings, "COMISION_PCT", 10)
         expulsar_vendedor(
             vendedor,
             f"Canceló el pedido #{pedido.id} con la comisión del {pct}% pendiente. "

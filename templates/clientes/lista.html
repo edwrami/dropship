@@ -1,45 +1,93 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize l10n %}
 {% block title %}Lista de {{ proveedor.nombre_tienda }} · ERA shop{% endblock %}
 {% block content %}
   <p class="kicker">{{ proveedor.get_tipo_display }} · {{ proveedor.ciudad }}</p>
   <h2>{{ proveedor.nombre_tienda }}</h2>
-  <p class="muted">Precio al por mayor, fotos y ficha. El teléfono del proveedor sigue oculto hasta que haces un pedido.</p>
+  <p class="muted">Elige productos y cantidades. La suma cambia al escribir y, al guardarla, queda en tu cuenta para consultarla después. El teléfono del proveedor sigue oculto hasta el pedido.</p>
   <p>
     <a class="btn sec" href="{% url 'proveedores_mayor' %}">Volver a proveedores</a>
     <a class="btn sec" href="{% url 'tienda_publica' proveedor.slug %}">Ver tienda pública</a>
+    {% if suma_productos %}<a class="btn" href="{% url 'carrito_pedido' proveedor.slug %}">Cerrar pedido</a>{% endif %}
   </p>
-  <div class="mayor-list">
-    {% for p in productos %}
-      <article class="mayor-item">
-        <div class="photo">{% include "productos/_slider.html" with producto=p %}</div>
-        <div>
-          <p class="kicker">{{ p.categoria_es|default:"Producto" }}</p>
-          <h3>{{ p.titulo }}</h3>
-          <p class="price">Al por mayor ${{ p.precio_mayor_cop|floatformat:0|intcomma }} COP</p>
-          <p class="meta">{% if p.en_promocion %}Promoción ${{ p.precio_promo_cop|floatformat:0|intcomma }} · normal ${{ p.precio_final_cop|floatformat:0|intcomma }}{% else %}Mostrador ${{ p.precio_final_cop|floatformat:0|intcomma }}{% endif %} · mínimo {{ p.cantidad_minima }}{% if p.unidad_empaque %} · {{ p.unidad_empaque }}{% endif %}</p>
-          <ul class="specs">
-            {% if p.marca %}<li>Marca: {{ p.marca }}</li>{% endif %}
-            <li>Condición: {{ p.get_condicion_display }}</li>
-            {% if p.material %}<li>Material: {{ p.material }}</li>{% endif %}
-            {% if p.color %}<li>Color: {{ p.color }}</li>{% endif %}
-            {% if p.talla %}<li>Talla: {{ p.talla }}</li>{% endif %}
-            {% if p.sku %}<li>Referencia: {{ p.sku }}</li>{% endif %}
-            {% if p.entrega_texto %}<li>Entrega: {{ p.entrega_texto }}</li>{% endif %}
-            <li>{% if p.modo_envio == "contraentrega" %}Envío contraentrega{% elif p.modo_envio == "aparte" %}Envío ${{ p.costo_envio_cop|floatformat:0|intcomma }}{% else %}Envío incluido en el precio{% endif %}</li>
-            {% if p.garantia_dias %}<li>Garantía: {{ p.garantia_dias }} días</li>{% endif %}
-            {% if p.controla_stock %}<li>Disponibles: {{ p.stock }}</li>{% endif %}
-          </ul>
-          {% if p.descripcion %}<div class="muted">{{ p.descripcion|linebreaks }}</div>{% endif %}
-          {% if cliente_completo %}
-            <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir desde {{ p.cantidad_minima }}</a>
-          {% else %}
-            <a class="btn" href="{% url 'mis_proveedores' %}">Completa el registro para pedir</a>
-          {% endif %}
-        </div>
-      </article>
-    {% empty %}
-      <p>Este proveedor aún no publicó precios al por mayor.</p>
-    {% endfor %}
-  </div>
+
+  <section class="card" id="suma-pedido">
+    <p>Suma de la mercancía</p>
+    <p class="price" id="suma-valor">${{ suma_bienes|floatformat:0|intcomma }}</p>
+    <p id="suma-texto">{{ suma_productos }} productos · {{ suma_unidades }} unidades guardadas.</p>
+    <p class="muted">El envío y el IVA se calculan al cerrar el pedido. En esa venta ERA shop retiene {{ comision_mayor_pct|floatformat:-2 }}% y Wompi cobra su tarifa. Esos valores no se suman a lo que pagas.</p>
+  </section>
+
+  <form method="post" id="lista-pedido">
+    {% csrf_token %}
+    <div class="mayor-list">
+      {% for p in productos %}
+        <article class="mayor-item">
+          <div class="photo">{% include "productos/_slider.html" with producto=p %}</div>
+          <div>
+            <p class="kicker">{{ p.categoria_es|default:"Producto" }}</p>
+            <h3>{{ p.titulo }}</h3>
+            <p class="price">Al por mayor ${{ p.precio_mayor_cop|floatformat:0|intcomma }} COP</p>
+            <p class="meta">{% if p.en_promocion %}Promoción ${{ p.precio_promo_cop|floatformat:0|intcomma }} · normal ${{ p.precio_final_cop|floatformat:0|intcomma }}{% else %}Mostrador ${{ p.precio_final_cop|floatformat:0|intcomma }}{% endif %} · mínimo {{ p.cantidad_minima }}{% if p.unidad_empaque %} · {{ p.unidad_empaque }}{% endif %}</p>
+            <ul class="specs">
+              {% if p.marca %}<li>Marca: {{ p.marca }}</li>{% endif %}
+              <li>Condición: {{ p.get_condicion_display }}</li>
+              {% if p.material %}<li>Material: {{ p.material }}</li>{% endif %}
+              {% if p.color %}<li>Color: {{ p.color }}</li>{% endif %}
+              {% if p.talla %}<li>Talla: {{ p.talla }}</li>{% endif %}
+              {% if p.sku %}<li>Referencia: {{ p.sku }}</li>{% endif %}
+              {% if p.entrega_texto %}<li>Entrega: {{ p.entrega_texto }}</li>{% endif %}
+              <li>{% if p.modo_envio == "contraentrega" %}Envío contraentrega{% elif p.modo_envio == "aparte" %}Envío ${{ p.costo_envio_cop|floatformat:0|intcomma }}{% else %}Envío incluido en el precio{% endif %}</li>
+              {% if p.garantia_dias %}<li>Garantía: {{ p.garantia_dias }} días</li>{% endif %}
+              {% if p.controla_stock %}<li>Disponibles: {{ p.stock }}</li>{% endif %}
+            </ul>
+            {% if p.descripcion %}<div class="muted">{{ p.descripcion|linebreaks }}</div>{% endif %}
+            {% if cliente_completo %}
+              <label>Cantidad
+                <input name="cantidad_{{ p.id }}" type="number" min="0" max="999" inputmode="numeric"
+                  value="{% if p.en_pedido %}{{ p.en_pedido }}{% endif %}"
+                  data-precio="{{ p.precio_mayor_cop|unlocalize }}"
+                  placeholder="Mínimo {{ p.cantidad_minima }}">
+              </label>
+              {% if p.en_pedido %}<p class="meta">Ya guardado: {{ p.en_pedido }}</p>{% endif %}
+            {% else %}
+              <a class="btn" href="{% url 'mis_proveedores' %}">Completa el registro para pedir</a>
+            {% endif %}
+          </div>
+        </article>
+      {% empty %}
+        <p>Este proveedor aún no publicó precios al por mayor.</p>
+      {% endfor %}
+    </div>
+    {% if cliente_completo and productos %}
+      <button class="btn" type="submit">Guardar esta suma</button>
+    {% endif %}
+  </form>
+  <script>
+  (function () {
+    var valor = document.getElementById("suma-valor");
+    var texto = document.getElementById("suma-texto");
+    if (!valor) return;
+    function dinero(n) {
+      return "$" + Math.round(n).toLocaleString("es-CO");
+    }
+    function pintar() {
+      var total = 0, unidades = 0, productos = 0;
+      document.querySelectorAll("#lista-pedido [data-precio]").forEach(function (el) {
+        var n = parseInt(el.value, 10) || 0;
+        if (n > 0) {
+          productos += 1;
+          unidades += n;
+          total += n * Number(el.dataset.precio || 0);
+        }
+      });
+      valor.textContent = dinero(total);
+      texto.textContent = productos + " productos · " + unidades + " unidades en esta suma.";
+    }
+    document.querySelectorAll("#lista-pedido [data-precio]").forEach(function (el) {
+      el.addEventListener("input", pintar);
+    });
+    pintar();
+  })();
+  </script>
 {% endblock %}

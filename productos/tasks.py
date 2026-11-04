@@ -10,6 +10,11 @@ def procesar_pedido(pedido_id):
         pedido.save(update_fields=["notas"])
         return
 
+    if pedido.es_mayor or pedido.lineas.exists():
+        pedido.notas = "Pedido al por mayor. Lo despacha la tienda."
+        pedido.save(update_fields=["notas"])
+        return
+
     if pedido.producto.origen != "aliexpress":
         pedido.notas = "Compra manual requerida (outlet)"
         pedido.save()

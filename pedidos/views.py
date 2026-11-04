@@ -138,6 +138,7 @@ def crear_pedido(request, producto_id):
             return _error("No hay suficientes unidades.")
 
         precio = Decimal(producto.precio_vigente)
+        es_mayor = False
         if producto.precio_mayor_cop and producto.vendedor_id and request.user.is_authenticated:
             from vendedores.models import ClienteTienda, Conexion
             try:
@@ -151,6 +152,7 @@ def crear_pedido(request, producto_id):
                 and Conexion.objects.filter(cliente=cliente, proveedor_id=producto.vendedor_id).exists()
             ):
                 precio = Decimal(producto.precio_mayor_cop)
+                es_mayor = True
             elif cantidad > 20:
                 return _error("En mostrador el máximo por pedido es 20. El precio al por mayor aplica si tu tienda está conectada y pides el mínimo.")
         elif cantidad > 20:
@@ -183,6 +185,8 @@ def crear_pedido(request, producto_id):
             modo_envio=modo,
             envio_cop=envio,
             monto_cop=subtotal,
+            subtotal_cop=subtotal,
+            es_mayor=es_mayor,
             estado="pendiente",
             estado_pago="pendiente",
             contacto_responsable=vendedor.responsable if vendedor else "",
@@ -640,6 +644,13 @@ def _resolver_reclamo(request, pedido, rol):
     messages.success(request, nota)
 
 
+def _porcentaje(valor):
+    numero = _decimal_get(valor)
+    if numero is None or numero < 0 or numero > 100:
+        return None
+    return numero.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 def _decimal_get(valor):
     try:
         return Decimal(str(valor).replace(",", "").strip())
@@ -677,6 +688,20 @@ def _registro_ventas(request):
             else:
                 cuenta.save()
                 messages.success(request, "Wompi guardado. El botón de pago ya puede cobrar.")
+        elif accion == "porcentajes":
+            detalle = _porcentaje(request.POST.get("detalle"))
+            mayor = _porcentaje(request.POST.get("mayor"))
+            if detalle is None or mayor is None:
+                messages.error(request, "Escribe cada porcentaje entre 0 y 100.")
+            else:
+                cuenta, _creada = CuentaPlataforma.objects.get_or_create(pk=1)
+                cuenta.comision_detalle_pct = detalle
+                cuenta.comision_mayor_pct = mayor
+                cuenta.save(update_fields=["comision_detalle_pct", "comision_mayor_pct"])
+                messages.success(
+                    request,
+                    "Porcentajes guardados. Las ventas nuevas, la calculadora y el pedido del establecimiento usan estos valores.",
+                )
         elif accion == "payouts":
             cuenta, _ = CuentaPlataforma.objects.get_or_create(pk=1)
             api_key = (request.POST.get("payouts_api_key") or "").strip()
@@ -721,7 +746,7 @@ def _registro_ventas(request):
         cola = request.GET.urlencode()
         return redirect(request.path + (f"?{cola}" if cola else ""))
 
-    qs = Pedido.objects.select_related("producto", "vendedor", "cliente_tienda", "pago", "giro")
+    qs = Pedido.objects.select_related("producto", "vendedor", "cliente_tienda", "pago", "giro").prefetch_related("lineas")
     q = (request.GET.get("q") or "").strip()
     if q:
         qs = qs.filter(
@@ -790,6 +815,7 @@ def _registro_ventas(request):
         Pedido.objects.filter(estado_pago="aprobado", vendedor__isnull=False)
         .filter(Q(giro__isnull=True) | Q(giro__estado__in=["pendiente", "sin_datos", "enviado", "rechazado"]))
         .select_related("vendedor", "producto", "giro")
+        .prefetch_related("lineas")
         .order_by("-creado")[:40]
     )
     return render(request, "pedidos/lista.html", {

@@ -4,10 +4,16 @@
     <tr>
       <td>{{ p.creado|date:"d/m/Y" }}</td>
       <td>{{ p.id }}</td>
-      <td>{{ p.producto.titulo|truncatechars:40 }}</td>
+      <td>
+        {% if p.lineas.all %}
+          {% for l in p.lineas.all %}{{ l.titulo|truncatechars:28 }} × {{ l.cantidad }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+        {% else %}
+          {{ p.producto.titulo|truncatechars:40 }}
+        {% endif %}
+      </td>
       <td>{% if p.vendedor %}{{ p.vendedor.nombre_tienda }}{% else %}ERA shop{% endif %}</td>
       <td>{{ p.cantidad }}</td>
-      <td>${{ p.monto_cop }}</td>
+      <td>${{ p.monto_cop }}{% if p.factura_iva %}<br><small>Con IVA</small>{% elif p.es_mayor %}<br><small>Sin IVA</small>{% endif %}</td>
       <td>{{ p.get_estado_pago_display }}</td>
       <td>{{ p.get_estado_display }}</td>
       <td>{% if p.calificacion %}{{ p.calificacion.estrellas }} de 5{% else %}—{% endif %}</td>

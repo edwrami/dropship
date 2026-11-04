@@ -15,12 +15,23 @@ def pdf_pedido(pedido):
         f"Resumen del pedido #{pedido.id}",
         f"Referencia: {pedido.referencia_pago}",
         f"Fecha: {pedido.creado:%d/%m/%Y %H:%M}",
-        f"Producto: {pedido.producto.titulo[:80]}",
+    ]
+    productos = list(pedido.lineas.all()[:12])
+    if productos:
+        for linea in productos:
+            lineas.append(f"{linea.titulo[:60]} x {linea.cantidad} = ${linea.subtotal_cop}")
+        if pedido.factura_iva:
+            lineas.append(f"Factura con IVA {pedido.iva_pct}%: ${pedido.iva_cop}")
+        elif pedido.es_mayor:
+            lineas.append("Factura sin IVA")
+    else:
+        lineas.append(f"Producto: {pedido.producto.titulo[:80]}")
+    lineas.extend([
         f"Cantidad: {pedido.cantidad}",
         f"Total: ${pedido.monto_cop} COP",
         f"Pago: {pedido.get_estado_pago_display}",
         f"Estado: {pedido.get_estado_display}",
-    ]
+    ])
     pago = getattr(pedido, "pago", None)
     if pago:
         lineas.append(f"Registro: {pago.get_estado_display} · {pago.metodo or 'sin medio'}")

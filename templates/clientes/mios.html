@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load humanize %}
 {% block title %}Mis proveedores · ERA shop{% endblock %}
 {% block content %}
   <p class="kicker">{{ cliente.ciudad }}</p>
@@ -11,7 +12,23 @@
     {{ form.as_p }}
     <button class="btn" type="submit">Guardar datos</button>
   </form>
-  <h3>Historial de compras</h3>
+  {% if abiertos %}
+    <h3>Pedidos en armado</h3>
+    <p class="muted">Estas sumas siguen guardadas. Ábrelas cuando quieras consultarlas o cerrar el pedido.</p>
+    <table>
+      <tr><th>Proveedor</th><th>Productos</th><th>Unidades</th><th>Mercancía</th><th></th></tr>
+      {% for a in abiertos %}
+        <tr>
+          <td>{{ a.proveedor.nombre_tienda }}</td>
+          <td>{{ a.productos }}</td>
+          <td>{{ a.unidades }}</td>
+          <td>${{ a.bienes|floatformat:0|intcomma }}</td>
+          <td><a href="{% url 'carrito_pedido' a.proveedor.slug %}">Abrir</a></td>
+        </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+  <h3 id="historial">Historial de compras</h3>
   <p class="muted">Aquí está todo lo que has pedido con esta cuenta, con este correo o desde este navegador. La conversación con la tienda sigue dentro de cada pedido.</p>
   {% include "clientes/_historial.html" %}
   <p><a class="btn" href="{% url 'proveedores_mayor' %}">Buscar mayoristas e importadores</a></p>

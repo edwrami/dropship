@@ -78,12 +78,23 @@
           <p><a href="{% url 'datos_comprador' %}">Corregir mis datos</a></p>
         {% endif %}
       </div>
-      <form method="post" action="{% url 'crear_pedido' producto.pk %}">
-        {% csrf_token %}
-        <label>Cantidad<input name="cantidad" type="number" min="1" max="{% if cliente_actual and producto.precio_mayor_cop %}999{% else %}20{% endif %}" value="1"></label>
-        <label>Variante<input name="variante" placeholder="Talla, color u otra variante"></label>
-        <button class="btn" type="submit">Hacer pedido y pagar</button>
-      </form>
+      {% if cliente_completo and ve_mayor %}
+        <form method="post" action="{% url 'agregar_carrito' producto.vendedor.slug %}">
+          {% csrf_token %}
+          <input type="hidden" name="producto" value="{{ producto.pk }}">
+          <label>Cantidad<input name="cantidad" type="number" min="{{ producto.cantidad_minima|default:1 }}" max="999" value="{{ producto.cantidad_minima|default:1 }}"></label>
+          <button class="btn" type="submit">Sumar al pedido</button>
+        </form>
+        <p class="muted">Se suma al pedido de este proveedor. La cuenta queda guardada para volver a consultarla.</p>
+        <p><a href="{% url 'carrito_pedido' producto.vendedor.slug %}">Ver la suma</a></p>
+      {% else %}
+        <form method="post" action="{% url 'crear_pedido' producto.pk %}">
+          {% csrf_token %}
+          <label>Cantidad<input name="cantidad" type="number" min="1" max="20" value="1"></label>
+          <label>Variante<input name="variante" placeholder="Talla, color u otra variante"></label>
+          <button class="btn" type="submit">Hacer pedido y pagar</button>
+        </form>
+      {% endif %}
     {% elif cliente_actual %}
       <p>El establecimiento ya tiene cuenta. Completa nombre, responsable, cédula o NIT, teléfono, dirección y ciudad antes de pedir.</p>
       <p><a class="btn" href="{% url 'mis_proveedores' %}">Completar el registro</a></p>

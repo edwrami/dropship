@@ -6,8 +6,8 @@
     <div class="error">{{ vendedor.motivo_sancion }}</div>
   {% endif %}
   <div class="aviso">
-    <p>Cuando el cliente paga en la página, el {{ comision_pct }}% se queda en ERA shop y el resto se gira al Nequi de tu tienda. No tienes que consignar esa comisión.</p>
-    <p>Las ventas antiguas, en las que el cliente te pagó directo, siguen debiendo el {{ comision_pct }}%. Si esa fecha pasa, la tienda sale de la página.</p>
+    <p>Cuando el cliente paga en la página, el porcentaje de ERA shop se queda aquí y el resto se gira al Nequi de tu tienda. No tienes que consignar esa comisión. Hoy es {{ comision_pct|floatformat:-2 }}%{% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %} en la lista al por mayor y {{ comision_detalle_pct|floatformat:-2 }}% en mostrador{% endif %}.</p>
+    <p>Las ventas antiguas, en las que el cliente te pagó directo, siguen debiendo la comisión de ese pedido. Si esa fecha pasa, la tienda sale de la página.</p>
   </div>
 
   <h3>Por cobrar (el cliente aún no paga)</h3>

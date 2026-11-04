@@ -33,6 +33,7 @@
           <a href="{% url 'salir_vendedor' %}">Salir</a>
         {% elif cliente_actual %}
           <a href="{% url 'mis_proveedores' %}">Mis proveedores</a>
+          {% if pedido_armado %}<a href="{% url 'mis_proveedores' %}">Pedido ({{ pedido_armado }})</a>{% endif %}
           <a href="{% url 'salir_vendedor' %}">Salir</a>
         {% elif comprador_actual %}
           <a href="{% url 'datos_comprador' %}">Mi cuenta</a>

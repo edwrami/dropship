@@ -27,7 +27,7 @@ class Pedido(models.Model):
         ("pendiente", "Pendiente de liquidar"),
         ("reportada", "Comprobante enviado"),
         ("pagada", "Liquidada"),
-        ("retenida", "El 10% quedó en ERA shop"),
+        ("retenida", "La comisión quedó en ERA shop"),
         ("vencida", "Vencida"),
         ("anulada", "Anulada"),
     ]
@@ -84,6 +84,11 @@ class Pedido(models.Model):
     comprobante = models.CharField(max_length=120, blank=True)
     metodo_pago = models.CharField(max_length=40, blank=True)
     monto_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    subtotal_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    es_mayor = models.BooleanField(default=False)
+    factura_iva = models.BooleanField(default=False)
+    iva_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    iva_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     comision_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     comision_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -109,6 +114,23 @@ class Pedido(models.Model):
 
     def __str__(self):
         return f"Pedido #{self.id} - {self.cliente_nombre}"
+
+
+class LineaPedido(models.Model):
+    pedido = models.ForeignKey(Pedido, related_name="lineas", on_delete=models.CASCADE)
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
+    titulo = models.CharField(max_length=300)
+    cantidad = models.PositiveIntegerField(default=1)
+    precio_unitario = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    modo_envio = models.CharField(max_length=20, blank=True)
+    envio_cop = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.titulo} × {self.cantidad}"
 
 
 class MensajePedido(models.Model):
@@ -229,6 +251,8 @@ class CuentaPlataforma(models.Model):
     payouts_user_id = models.CharField(max_length=80, blank=True)
     payouts_account_id = models.CharField(max_length=80, blank=True)
     visitas = models.PositiveIntegerField(default=0)
+    comision_detalle_pct = models.DecimalField(max_digits=5, decimal_places=2, default=10)
+    comision_mayor_pct = models.DecimalField(max_digits=5, decimal_places=2, default=5)
 
     class Meta:
         verbose_name = "cuenta de comisiones"

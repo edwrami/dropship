@@ -1,3 +1,6 @@
+import uuid
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -7,11 +10,13 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from pedidos.models import Pedido
+from pedidos.models import LineaPedido, MensajePedido, Pedido
+from productos.models import Producto
 
 from .forms import DatosClienteForm, DatosCompradorForm, RegistroClienteForm, RegistroCompradorForm
-from .models import ClienteTienda, Comprador, Conexion, Vendedor
+from .models import Carrito, CarritoLinea, ClienteTienda, Comprador, Conexion, Vendedor
 from .opciones import DEPARTAMENTOS, TIPOS_PROVEEDOR
+from .services import aplicar_comision, iva_mercancia, peso
 
 
 def _cliente(user):
@@ -157,27 +162,350 @@ def _conexion(cliente, proveedor):
     return Conexion.objects.filter(cliente=cliente, proveedor=proveedor).first()
 
 
-@login_required(login_url="entrar_cliente")
-def lista_mayorista(request, slug):
+def _entero(valor, minimo=0, maximo=999):
+    try:
+        numero = int(valor)
+    except (TypeError, ValueError):
+        return None
+    if numero < minimo:
+        return None
+    if numero > maximo:
+        return maximo
+    return numero
+
+
+def _exigir_conexion(request, slug):
     cliente = _cliente(request.user)
     if cliente is None:
-        messages.error(request, "Esta lista es para tiendas registradas.")
-        return redirect("registro_cliente")
+        messages.error(request, "Entra con la cuenta del establecimiento.")
+        return None, None, redirect("entrar_cliente")
     proveedor = get_object_or_404(Vendedor, slug=slug, estado="activo", tipo__in=TIPOS_PROVEEDOR)
     if _conexion(cliente, proveedor) is None:
         messages.error(request, "Conéctate con este proveedor para ver sus precios al por mayor.")
-        return redirect("proveedores_mayor")
-    productos = (
+        return None, None, redirect("proveedores_mayor")
+    return cliente, proveedor, None
+
+
+def _productos_lista(proveedor):
+    return (
         proveedor.productos.filter(activo=True, precio_mayor_cop__isnull=False)
         .filter(Q(controla_stock=False) | Q(stock__gt=0))
         .select_related("rubro", "rubro__padre")
         .prefetch_related("fotos")
     )
+
+
+def _obtener_carrito(cliente, proveedor):
+    carrito, _creado = Carrito.objects.get_or_create(cliente=cliente, proveedor=proveedor)
+    return carrito
+
+
+def _limpiar_carrito(carrito):
+    for linea in list(carrito.lineas.select_related("producto")):
+        producto = linea.producto
+        if (
+            not producto.activo
+            or producto.precio_mayor_cop is None
+            or producto.vendedor_id != carrito.proveedor_id
+        ):
+            linea.delete()
+
+
+def _guardar_seleccion(carrito, productos, request):
+    errores = []
+    guardados = 0
+    for producto in productos:
+        raw = (request.POST.get(f"cantidad_{producto.id}") or "").strip()
+        if raw in ("", "0"):
+            CarritoLinea.objects.filter(carrito=carrito, producto=producto).delete()
+            continue
+        cantidad = _entero(raw, 1, 999)
+        minimo = producto.cantidad_minima or 1
+        if cantidad is None or cantidad < minimo:
+            errores.append(f"El mínimo de {producto.titulo} es {minimo}.")
+            continue
+        if producto.controla_stock and producto.stock < cantidad:
+            errores.append(f"De {producto.titulo} solo hay {producto.stock}.")
+            continue
+        linea, _creada = CarritoLinea.objects.get_or_create(
+            carrito=carrito, producto=producto, defaults={"cantidad": cantidad},
+        )
+        linea.cantidad = cantidad
+        linea.save(update_fields=["cantidad"])
+        guardados += 1
+    if errores:
+        messages.error(request, " ".join(errores))
+    elif guardados:
+        messages.success(request, "Pedido actualizado. La suma queda guardada en tu cuenta.")
+    else:
+        messages.success(request, "El pedido de este proveedor quedó vacío.")
+
+
+def _filas_carrito(carrito):
+    filas = []
+    bienes = Decimal("0")
+    envio = Decimal("0")
+    unidades = 0
+    for linea in carrito.lineas.select_related("producto"):
+        producto = linea.producto
+        precio = Decimal(producto.precio_mayor_cop or 0)
+        modo = producto.modo_envio or ("incluido" if producto.envio_gratis else "aparte")
+        envio_linea = Decimal(producto.costo_envio_cop or 0) if modo == "aparte" else Decimal("0")
+        subtotal = peso(precio * linea.cantidad)
+        bienes += subtotal
+        envio += envio_linea
+        unidades += linea.cantidad
+        filas.append({
+            "linea": linea,
+            "producto": producto,
+            "precio": precio,
+            "modo": modo,
+            "envio": envio_linea,
+            "subtotal": subtotal,
+        })
+    return filas, peso(bienes), peso(envio), unidades
+
+
+@login_required(login_url="entrar_cliente")
+def lista_mayorista(request, slug):
+    cliente, proveedor, respuesta = _exigir_conexion(request, slug)
+    if respuesta:
+        return respuesta
+    productos = list(_productos_lista(proveedor))
+    carrito = _obtener_carrito(cliente, proveedor)
+    if request.method == "POST":
+        if not cliente.registro_completo():
+            messages.error(request, "Completa el registro del establecimiento antes de armar el pedido.")
+            return redirect("mis_proveedores")
+        _guardar_seleccion(carrito, productos, request)
+        return redirect("lista_mayorista", slug=slug)
+    _limpiar_carrito(carrito)
+    en_pedido = {linea.producto_id: linea.cantidad for linea in carrito.lineas.all()}
+    bienes = Decimal("0")
+    unidades = 0
+    for producto in productos:
+        producto.en_pedido = en_pedido.get(producto.id, 0)
+        if producto.en_pedido:
+            bienes += Decimal(producto.precio_mayor_cop or 0) * producto.en_pedido
+            unidades += producto.en_pedido
     return render(request, "clientes/lista.html", {
         "proveedor": proveedor,
         "productos": productos,
         "cliente": cliente,
+        "suma_bienes": peso(bienes),
+        "suma_unidades": unidades,
+        "suma_productos": sum(1 for producto in productos if producto.en_pedido),
     })
+
+
+@login_required(login_url="entrar_cliente")
+@require_POST
+def agregar_carrito(request, slug):
+    cliente, proveedor, respuesta = _exigir_conexion(request, slug)
+    if respuesta:
+        return respuesta
+    if not cliente.registro_completo():
+        messages.error(request, "Completa el registro del establecimiento antes de armar el pedido.")
+        return redirect("mis_proveedores")
+    producto = get_object_or_404(
+        proveedor.productos.filter(activo=True, precio_mayor_cop__isnull=False),
+        pk=request.POST.get("producto") or 0,
+    )
+    minimo = producto.cantidad_minima or 1
+    cantidad = _entero(request.POST.get("cantidad"), minimo, 999)
+    destino = redirect("carrito_pedido", slug=slug)
+    if cantidad is None:
+        messages.error(request, f"El mínimo de {producto.titulo} es {minimo}.")
+        return destino
+    carrito = _obtener_carrito(cliente, proveedor)
+    linea = CarritoLinea.objects.filter(carrito=carrito, producto=producto).first()
+    nueva = cantidad if linea is None else min(999, linea.cantidad + cantidad)
+    if producto.controla_stock and producto.stock < nueva:
+        messages.error(request, f"De {producto.titulo} solo hay {producto.stock}.")
+        return destino
+    if linea is None:
+        CarritoLinea.objects.create(carrito=carrito, producto=producto, cantidad=nueva)
+    else:
+        linea.cantidad = nueva
+        linea.save(update_fields=["cantidad"])
+    messages.success(request, f"{producto.titulo} quedó en el pedido. La suma ya incluye esa cantidad.")
+    return destino
+
+
+@login_required(login_url="entrar_cliente")
+def carrito_pedido(request, slug):
+    cliente, proveedor, respuesta = _exigir_conexion(request, slug)
+    if respuesta:
+        return respuesta
+    if not cliente.registro_completo():
+        messages.error(request, "Completa el registro del establecimiento antes de pedir.")
+        return redirect("mis_proveedores")
+    carrito = _obtener_carrito(cliente, proveedor)
+    _limpiar_carrito(carrito)
+    if request.method == "POST":
+        accion = request.POST.get("accion") or ""
+        if accion.startswith("quitar-"):
+            carrito.lineas.filter(pk=accion.split("-")[-1] or 0).delete()
+            messages.success(request, "Producto quitado. La suma se actualizó.")
+            return redirect("carrito_pedido", slug=slug)
+        if accion == "confirmar":
+            pedido, error = _confirmar_carrito(request, cliente, proveedor, carrito)
+            if error:
+                messages.error(request, error)
+            else:
+                from pedidos.avisos import avisar_pedido_nuevo
+                from pedidos.views import _marcar_contacto
+
+                _marcar_contacto(request, pedido)
+                avisar_pedido_nuevo(
+                    pedido,
+                    request.build_absolute_uri(f"/pedidos/{pedido.id}/?clave={pedido.clave_contacto}"),
+                    request.build_absolute_uri(f"/pedidos/{pedido.id}/"),
+                )
+                return redirect(f"/pedidos/pagar/{pedido.id}/?clave={pedido.clave_contacto}")
+    filas, bienes, envio, unidades = _filas_carrito(carrito)
+    pct_iva, iva = iva_mercancia(bienes, True)
+    from .services import porcentajes_comision, tarifa_wompi
+
+    _detalle, mayor = porcentajes_comision()
+    total_sin = peso(bienes + envio)
+    total_con = peso(bienes + envio + iva)
+    return render(request, "clientes/carrito.html", {
+        "proveedor": proveedor,
+        "cliente": cliente,
+        "filas": filas,
+        "bienes": bienes,
+        "envio": envio,
+        "unidades": unidades,
+        "iva_pct": pct_iva,
+        "iva_cop": iva,
+        "total_sin": total_sin,
+        "total_con": total_con,
+        "comision_sin": peso(total_sin * mayor / Decimal("100")),
+        "wompi_sin": tarifa_wompi(total_sin),
+        "comision_con": peso(total_con * mayor / Decimal("100")),
+        "wompi_con": tarifa_wompi(total_con),
+        "neto_sin": max(total_sin - peso(total_sin * mayor / Decimal("100")) - tarifa_wompi(total_sin), 0),
+        "neto_con": max(total_con - peso(total_con * mayor / Decimal("100")) - tarifa_wompi(total_con), 0),
+    })
+
+
+@transaction.atomic
+def _confirmar_carrito(request, cliente, proveedor, carrito):
+    lineas = list(carrito.lineas.select_related("producto").order_by("id"))
+    if not lineas:
+        return None, "El pedido está vacío."
+    bloqueados = {
+        producto.id: producto
+        for producto in Producto.objects.select_for_update().filter(
+            pk__in=sorted({linea.producto_id for linea in lineas}),
+        )
+    }
+    errores = []
+    preparados = []
+    bienes = Decimal("0")
+    envio_total = Decimal("0")
+    unidades = 0
+    for linea in lineas:
+        producto = bloqueados.get(linea.producto_id)
+        raw = request.POST.get(f"cantidad_{linea.id}")
+        cantidad = _entero(raw, 1, 999) if raw not in (None, "") else linea.cantidad
+        titulo = producto.titulo if producto is not None else "Producto"
+        if producto is None or cantidad is None:
+            errores.append(f"La cantidad de {titulo} no es válida.")
+            continue
+        minimo = producto.cantidad_minima or 1
+        if cantidad < minimo:
+            errores.append(f"El mínimo de {titulo} es {minimo}.")
+            continue
+        if not producto.activo or producto.precio_mayor_cop is None:
+            errores.append(f"{titulo} ya no está en la lista.")
+            continue
+        if producto.controla_stock and producto.stock < cantidad:
+            errores.append(f"De {titulo} solo hay {producto.stock}.")
+            continue
+        precio = Decimal(producto.precio_mayor_cop)
+        modo = producto.modo_envio or ("incluido" if producto.envio_gratis else "aparte")
+        envio_linea = Decimal(producto.costo_envio_cop or 0) if modo == "aparte" else Decimal("0")
+        subtotal = peso(precio * cantidad)
+        bienes += subtotal
+        envio_total += envio_linea
+        unidades += cantidad
+        preparados.append((linea, producto, cantidad, precio, modo, envio_linea, subtotal))
+    if errores or not preparados:
+        return None, " ".join(errores) or "No hay productos para pedir."
+    con_iva = request.POST.get("factura") == "con"
+    iva_pct, iva = iva_mercancia(bienes, con_iva)
+    base = peso(bienes + envio_total)
+    modos = {item[4] for item in preparados}
+    modo = modos.pop() if len(modos) == 1 else "mixto"
+    primero = preparados[0][1]
+    pedido = Pedido.objects.create(
+        producto=primero,
+        vendedor=proveedor,
+        cliente_tienda=cliente,
+        cantidad=unidades,
+        cliente_nombre=cliente.nombre_tienda,
+        cliente_telefono=cliente.telefono,
+        cliente_email=cliente.user.email,
+        cliente_direccion=cliente.direccion,
+        cliente_barrio=cliente.barrio,
+        cliente_ciudad=cliente.ciudad,
+        cliente_departamento=cliente.departamento,
+        cliente_documento=cliente.documento,
+        cliente_referencia=cliente.referencia,
+        modo_envio=modo,
+        envio_cop=peso(envio_total),
+        monto_cop=base + iva,
+        subtotal_cop=base,
+        es_mayor=True,
+        factura_iva=con_iva,
+        iva_pct=iva_pct,
+        iva_cop=iva,
+        estado="pendiente",
+        estado_pago="pendiente",
+        contacto_responsable=proveedor.responsable,
+        contacto_telefono=proveedor.telefono,
+        contacto_whatsapp=proveedor.whatsapp,
+        contacto_email=proveedor.user.email,
+        contacto_direccion=proveedor.direccion,
+        contacto_nequi=proveedor.nequi,
+        clave_contacto=uuid.uuid4().hex,
+    )
+    extra = (pedido.id % 89) + 1
+    pedido.monto_cop = base + iva + extra
+    pedido.referencia_pago = f"PED-{pedido.id}"
+    aplicar_comision(pedido)
+    pedido.save()
+    textos = []
+    for linea, producto, cantidad, precio, modo_linea, envio_linea, subtotal in preparados:
+        LineaPedido.objects.create(
+            pedido=pedido,
+            producto=producto,
+            titulo=producto.titulo[:300],
+            cantidad=cantidad,
+            precio_unitario=precio,
+            modo_envio=modo_linea,
+            envio_cop=envio_linea,
+            subtotal_cop=subtotal,
+        )
+        if producto.controla_stock:
+            producto.stock -= cantidad
+            producto.save(update_fields=["stock"])
+        linea.delete()
+        textos.append(f"{producto.titulo}: {cantidad} × ${peso(precio)}")
+    factura = "Factura con IVA." if con_iva else "Factura sin IVA."
+    MensajePedido.objects.create(
+        pedido=pedido,
+        autor="plataforma",
+        nombre="ERA shop",
+        texto=(
+            f"Pedido al por mayor de {cliente.nombre_tienda}, responsable {cliente.responsable}. "
+            f"{factura} Queda guardado para el establecimiento y para el proveedor.\n"
+            + "\n".join(textos)
+        ),
+    )
+    return pedido, ""
 
 
 def pedidos_del_comprador(request, cliente=None, comprador=None):
@@ -200,7 +528,11 @@ def pedidos_del_comprador(request, cliente=None, comprador=None):
         email = (comprador.user.email or "").strip()
         if email:
             consulta |= Q(cliente_email__iexact=email)
-    return Pedido.objects.filter(consulta).select_related("producto", "vendedor")
+    return (
+        Pedido.objects.filter(consulta)
+        .select_related("producto", "vendedor")
+        .prefetch_related("lineas")
+    )
 
 
 def historial_comprador(request):
@@ -295,9 +627,25 @@ def mis_proveedores(request):
         messages.success(request, "Datos del establecimiento actualizados.")
         return redirect("mis_proveedores")
     conexiones = cliente.conexiones.select_related("proveedor").order_by("proveedor__nombre_tienda")
+    abiertos = []
+    for carrito in cliente.carritos.select_related("proveedor").prefetch_related("lineas__producto"):
+        lineas = [
+            linea for linea in carrito.lineas.all()
+            if linea.producto.activo and linea.producto.precio_mayor_cop is not None
+        ]
+        if not lineas:
+            continue
+        bienes = sum((Decimal(linea.producto.precio_mayor_cop) * linea.cantidad for linea in lineas), Decimal("0"))
+        abiertos.append({
+            "proveedor": carrito.proveedor,
+            "productos": len(lineas),
+            "unidades": sum(linea.cantidad for linea in lineas),
+            "bienes": peso(bienes),
+        })
     return render(request, "clientes/mios.html", {
         "cliente": cliente,
         "form": form,
         "conexiones": conexiones,
         "pedidos": pedidos_del_comprador(request, cliente),
+        "abiertos": abiertos,
     })

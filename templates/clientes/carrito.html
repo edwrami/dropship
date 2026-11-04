@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load humanize l10n %}
+{% block title %}Pedido con {{ proveedor.nombre_tienda }} · ERA shop{% endblock %}
+{% block content %}
+  <p class="kicker">{{ cliente.nombre_tienda }}</p>
+  <h2>Pedido con {{ proveedor.nombre_tienda }}</h2>
+  <p class="muted">Esta suma queda guardada en tu cuenta. Puedes volver a consultarla antes de pagar y, después del pedido, en tu historial.</p>
+  <p><a class="btn sec" href="{% url 'lista_mayorista' proveedor.slug %}">Seguir agregando</a></p>
+
+  {% if not filas %}
+    <p>Todavía no hay productos en este pedido.</p>
+  {% else %}
+    <form method="post" id="cierre-pedido"
+      data-pct="{{ comision_mayor_pct|unlocalize }}"
+      data-wompi-pct="{{ wompi_pct|unlocalize }}"
+      data-wompi-fijo="{{ wompi_fijo|unlocalize }}"
+      data-wompi-iva="{{ wompi_iva|unlocalize }}"
+      data-iva="{{ iva_pct|unlocalize }}">
+      {% csrf_token %}
+      <table>
+        <tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Suma</th><th></th></tr>
+        {% for f in filas %}
+          <tr>
+            <td>{{ f.producto.titulo }}{% if f.producto.unidad_empaque %}<br><small>{{ f.producto.unidad_empaque }}</small>{% endif %}</td>
+            <td>${{ f.precio|floatformat:0|intcomma }}</td>
+            <td>
+              <input name="cantidad_{{ f.linea.id }}" type="number" min="{{ f.producto.cantidad_minima|default:1 }}" max="999"
+                value="{{ f.linea.cantidad }}" data-precio="{{ f.precio|unlocalize }}" data-envio="{{ f.envio|unlocalize }}" required>
+            </td>
+            <td class="linea-suma">${{ f.subtotal|floatformat:0|intcomma }}</td>
+            <td><button class="btn sec" type="submit" form="quitar-{{ f.linea.id }}">Quitar</button></td>
+          </tr>
+        {% endfor %}
+      </table>
+
+      <fieldset>
+        <legend>Factura</legend>
+        <label><input type="radio" name="factura" value="sin" checked> Sin IVA</label>
+        <label><input type="radio" name="factura" value="con"> Con IVA del {{ iva_pct|floatformat:-2 }}% sobre la mercancía</label>
+      </fieldset>
+      <p class="muted">Wompi cobra IVA sobre su propia tarifa en todos los pagos. Ese IVA no se puede quitar: es el impuesto de la pasarela, no el de tu factura.</p>
+
+      <section class="card" id="cuenta-pedido">
+        <p>Mercancía <strong id="cuenta-bienes">${{ bienes|floatformat:0|intcomma }}</strong></p>
+        <p>Envío <strong id="cuenta-envio">{% if envio %}${{ envio|floatformat:0|intcomma }}{% else %}incluido o contraentrega{% endif %}</strong></p>
+        <p>IVA de la factura <strong id="cuenta-iva">$0</strong></p>
+        <p class="price">Total a pagar <span id="cuenta-total">${{ total_sin|floatformat:0|intcomma }}</span></p>
+        <p>De ese pago, ERA shop retiene <strong id="cuenta-pct">{{ comision_mayor_pct|floatformat:-2 }}%</strong>: <strong id="cuenta-comision">${{ comision_sin|floatformat:0|intcomma }}</strong>.</p>
+        <p>Wompi cobra <strong id="cuenta-wompi">${{ wompi_sin|floatformat:0|intcomma }}</strong> ({{ wompi_pct }}% + ${{ wompi_fijo }}, más el {{ wompi_iva }}% de IVA solo sobre esa tarifa).</p>
+        <p>Al proveedor le quedan <strong id="cuenta-neto">${{ neto_sin|floatformat:0|intcomma }}</strong>. Esos dos descuentos no se suman a tu total: salen del pago.</p>
+      </section>
+      <button class="btn" type="submit" name="accion" value="confirmar">Hacer el pedido y pagar</button>
+    </form>
+    {% for f in filas %}
+      <form id="quitar-{{ f.linea.id }}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="quitar-{{ f.linea.id }}">
+      </form>
+    {% endfor %}
+    <script>
+    (function () {
+      var form = document.getElementById("cierre-pedido");
+      if (!form) return;
+      var pct = Number(form.dataset.pct) || 0;
+      var wompiPct = Number(form.dataset.wompiPct) || 0;
+      var fijo = Number(form.dataset.wompiFijo) || 0;
+      var wompiIva = Number(form.dataset.wompiIva) || 0;
+      var ivaPct = Number(form.dataset.iva) || 0;
+      function dinero(n) { return "$" + Math.round(n).toLocaleString("es-CO"); }
+      function pintar() {
+        var bienes = 0, envio = 0;
+        form.querySelectorAll("[data-precio]").forEach(function (el) {
+          var n = parseInt(el.value, 10) || 0;
+          var sub = n * Number(el.dataset.precio || 0);
+          bienes += sub;
+          envio += n > 0 ? Number(el.dataset.envio || 0) : 0;
+          var celda = el.closest("tr") && el.closest("tr").querySelector(".linea-suma");
+          if (celda) celda.textContent = dinero(sub);
+        });
+        var con = form.querySelector("input[name=factura]:checked");
+        var iva = con && con.value === "con" ? Math.round(bienes * ivaPct / 100) : 0;
+        var total = Math.round(bienes + envio + iva);
+        var comision = Math.round(total * pct / 100);
+        var tarifa = Math.round((total * wompiPct / 100 + fijo) * (1 + wompiIva / 100));
+        var neto = total - comision - tarifa;
+        if (neto < 0) neto = 0;
+        document.getElementById("cuenta-bienes").textContent = dinero(bienes);
+        document.getElementById("cuenta-envio").textContent = envio ? dinero(envio) : "incluido o contraentrega";
+        document.getElementById("cuenta-iva").textContent = dinero(iva);
+        document.getElementById("cuenta-total").textContent = dinero(total);
+        document.getElementById("cuenta-comision").textContent = dinero(comision);
+        document.getElementById("cuenta-wompi").textContent = dinero(tarifa);
+        document.getElementById("cuenta-neto").textContent = dinero(neto);
+      }
+      form.addEventListener("input", pintar);
+      form.addEventListener("change", pintar);
+      pintar();
+    })();
+    </script>
+  {% endif %}
+{% endblock %}

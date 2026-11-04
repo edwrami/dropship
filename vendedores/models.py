@@ -164,3 +164,31 @@ class Conexion(models.Model):
 
     def __str__(self):
         return f"{self.cliente.nombre_tienda} → {self.proveedor.nombre_tienda}"
+
+
+class Carrito(models.Model):
+    cliente = models.ForeignKey(ClienteTienda, related_name="carritos", on_delete=models.CASCADE)
+    proveedor = models.ForeignKey(Vendedor, related_name="carritos", on_delete=models.CASCADE)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["cliente", "proveedor"], name="carrito_cliente_proveedor"),
+        ]
+
+    def __str__(self):
+        return f"Pedido de {self.cliente.nombre_tienda} con {self.proveedor.nombre_tienda}"
+
+
+class CarritoLinea(models.Model):
+    carrito = models.ForeignKey(Carrito, related_name="lineas", on_delete=models.CASCADE)
+    producto = models.ForeignKey("productos.Producto", on_delete=models.PROTECT)
+    cantidad = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["carrito", "producto"], name="carrito_linea_producto"),
+        ]
+
+    def __str__(self):
+        return f"{self.producto_id} × {self.cantidad}"

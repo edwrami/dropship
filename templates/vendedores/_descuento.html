@@ -1,6 +1,7 @@
-<div class="aviso" id="cuenta-descuento" data-pct="{{ comision_pct }}" data-wompi-pct="{{ wompi_pct }}" data-wompi-fijo="{{ wompi_fijo }}" data-wompi-iva="{{ wompi_iva }}">
+{% load l10n %}
+<div class="aviso" id="cuenta-descuento" data-pct="{{ comision_pct|unlocalize }}" data-wompi-pct="{{ wompi_pct|unlocalize }}" data-wompi-fijo="{{ wompi_fijo|unlocalize }}" data-wompi-iva="{{ wompi_iva|unlocalize }}">
   <p>Del precio que paga el cliente se descuentan dos cosas, y las dos las asumes tú:</p>
-  <p>El <strong>{{ comision_pct }}%</strong> se queda en ERA shop.</p>
+  <p>El <strong>{{ comision_pct|floatformat:-2 }}%</strong> se queda en ERA shop.{% if vendedor_actual and vendedor_actual.tipo != "detallista" %} En la lista al por mayor es {{ comision_mayor_pct|floatformat:-2 }}%. En el mostrador, {{ comision_detalle_pct|floatformat:-2 }}%.{% endif %}</p>
   <p>Wompi cobra <strong>{{ wompi_pct }}%</strong> del valor más <strong>${{ wompi_fijo }}</strong>, y el IVA del <strong>{{ wompi_iva }}%</strong> solo sobre esa tarifa.</p>
   <p>Puedes sumar esos cargos al precio o publicar el precio ya con todo incluido. El cliente paga un solo valor. A tu Nequi llega lo que queda.</p>
   <label>Lo que te cuesta el producto<input id="mi-costo" inputmode="numeric" placeholder="Ej. 50000"></label>
@@ -22,6 +23,7 @@
   var resultado = document.getElementById("resultado-precio");
   var usar = document.getElementById("usar-precio");
   var precioCampo = document.getElementById("id_precio_final_cop");
+  var mayorCampo = document.getElementById("id_precio_mayor_cop");
   var promoCampo = document.getElementById("id_precio_promo_cop");
   var costoCampo = document.getElementById("id_precio_costo");
   function dinero(n) {
@@ -55,7 +57,7 @@
     var base = leer(costo) || leer(costoCampo);
     var minimoValor = base ? minimoPara(base) : 0;
     minimo.textContent = minimoValor ? dinero(minimoValor) : "—";
-    var precio = leer(promoCampo) || leer(precioCampo) || minimoValor;
+    var precio = leer(promoCampo) || leer(mayorCampo) || leer(precioCampo) || minimoValor;
     if (!precio) {
       resultado.textContent = "Escribe lo que te cuesta, o el precio del producto, para ver los descuentos.";
       return;
@@ -66,14 +68,16 @@
   }
   costo.addEventListener("input", pintar);
   if (precioCampo) precioCampo.addEventListener("input", pintar);
+  if (mayorCampo) mayorCampo.addEventListener("input", pintar);
   if (promoCampo) promoCampo.addEventListener("input", pintar);
   if (costoCampo) costoCampo.addEventListener("input", pintar);
-  if (!precioCampo) usar.hidden = true;
+  var destino = mayorCampo || precioCampo;
+  if (!destino) usar.hidden = true;
   usar.addEventListener("click", function () {
     var base = leer(costo) || leer(costoCampo);
-    if (!base || !precioCampo) return;
-    precioCampo.value = String(minimoPara(base));
-    precioCampo.dispatchEvent(new Event("input"));
+    if (!base || !destino) return;
+    destino.value = String(minimoPara(base));
+    destino.dispatchEvent(new Event("input"));
     pintar();
   });
   pintar();

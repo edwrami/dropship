@@ -3,8 +3,16 @@
 {% block title %}Pedido #{{ pedido.id }} · ERA shop{% endblock %}
 {% block content %}
   <p class="kicker">Pedido #{{ pedido.id }} · {{ pedido.referencia_pago }}</p>
-  <h2>{{ pedido.producto.titulo }}</h2>
+  <h2>{% if pedido.lineas.all %}Pedido de {{ pedido.cliente_nombre }}{% else %}{{ pedido.producto.titulo }}{% endif %}</h2>
   <p class="price">${{ pedido.monto_cop|floatformat:0|intcomma }} COP · {{ pedido.cantidad }} und.</p>
+  {% if pedido.lineas.all %}
+    <ul>
+      {% for l in pedido.lineas.all %}
+        <li>{{ l.titulo }} · {{ l.cantidad }} × ${{ l.precio_unitario|floatformat:0|intcomma }}{% if l.envio_cop %} · envío ${{ l.envio_cop|floatformat:0|intcomma }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+    <p>{% if pedido.factura_iva %}Factura con IVA ${{ pedido.iva_cop|floatformat:0|intcomma }}.{% else %}Factura sin IVA.{% endif %} ERA shop retiene {{ pedido.comision_pct|floatformat:-2 }}% (${{ pedido.comision_cop|floatformat:0|intcomma }}). Wompi ${{ pedido.tarifa_pasarela_cop|floatformat:0|intcomma }}.</p>
+  {% endif %}
   <p class="meta">Pago: {{ pedido.get_estado_pago_display }} · Pedido: {{ pedido.get_estado_display }}{% if pedido.tracking %} · Guía {{ pedido.tracking }}{% endif %}</p>
   {% if pedido.pago %}
     <p class="note">Quedó registrado: ${{ pedido.pago.monto_cop|floatformat:0 }} por {{ pedido.pago.metodo }}. {{ pedido.pago.get_estado_display }}.</p>

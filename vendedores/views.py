@@ -120,7 +120,7 @@ def panel(request):
     vendedor.refresh_from_db()
     productos = vendedor.productos.all()
     conexiones = vendedor.clientes_conectados.select_related("cliente") if vendedor.es_proveedor else []
-    pedidos = vendedor.pedidos.select_related("producto", "giro").all()
+    pedidos = vendedor.pedidos.select_related("producto", "giro").prefetch_related("lineas").all()
     deuda = pedidos.filter(estado_comision__in=["pendiente", "reportada"]).aggregate(
         s=Sum("comision_cop")
     )["s"] or 0

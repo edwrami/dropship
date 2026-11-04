@@ -28,7 +28,7 @@
     <p><strong>Categorías:</strong>
       {% for c in vendedor.categorias.all %}{{ c.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}Ninguna{% endfor %}
     </p>
-    <p><strong>Comisión por pedido:</strong> {{ comision_pct }}% · plazo {{ dias_liquidacion }} días después del pago del cliente.</p>
+    <p><strong>Comisión por pedido:</strong> {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}{{ comision_mayor_pct|floatformat:-2 }}% al por mayor · {{ comision_detalle_pct|floatformat:-2 }}% en mostrador{% else %}{{ comision_detalle_pct|floatformat:-2 }}%{% endif %} · plazo {{ dias_liquidacion }} días después del pago del cliente.</p>
     <p><strong>Visitas de tu página:</strong> {{ vendedor.visitas }}</p>
     <p><strong>Calificación pública:</strong> {% if nota_publica %}{{ nota_publica|floatformat:1 }} de 5{% else %}Sin calificación todavía{% endif %}{% if total_notas %} · {{ total_notas }} comentarios{% endif %}</p>
     <p><strong>Por liquidar ahora:</strong> ${{ deuda }} COP</p>
@@ -41,7 +41,7 @@
 
   {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}
     <h3>Tiendas conectadas</h3>
-    <p class="muted">Publica cada producto con precio al por mayor, cantidad mínima y especificaciones. Las fotos son opcionales. El establecimiento ve la lista después de registrarse y conectarse. El teléfono sigue oculto hasta el pedido.</p>
+    <p class="muted">Publica cada producto con precio al por mayor, cantidad mínima y especificaciones. Las fotos son opcionales. El establecimiento suma productos y cantidades, y ese pedido queda guardado. En esa venta el porcentaje es el de al por mayor. El teléfono sigue oculto hasta el pedido.</p>
     <table>
       <tr><th>Tienda</th><th>Ciudad</th><th>Desde</th></tr>
       {% for c in conexiones %}
@@ -108,13 +108,13 @@
   </table>
 
   <h3>Pedidos</h3>
-  <p class="muted">El pedido es el canal con el cliente. Del precio se descuentan el 10% de ERA shop y la tarifa de Wompi. El resto se consigna al Nequi de esta tienda.</p>
+  <p class="muted">El pedido es el canal con el cliente. Del precio se descuentan el porcentaje de ERA shop y la tarifa de Wompi. El resto se consigna al Nequi de esta tienda.</p>
   <table>
-    <tr><th>#</th><th>Producto</th><th>Cliente</th><th>Pago</th><th>Venta</th><th>Comisión {{ comision_pct }}%</th><th>Estado comisión</th><th></th></tr>
+    <tr><th>#</th><th>Producto</th><th>Cliente</th><th>Pago</th><th>Venta</th><th>Comisión</th><th>Estado comisión</th><th></th></tr>
     {% for p in pedidos %}
       <tr>
         <td>{{ p.id }}</td>
-        <td>{{ p.producto.titulo|truncatechars:40 }}</td>
+        <td>{% if p.lineas.all %}{{ p.lineas.all|length }} productos{% else %}{{ p.producto.titulo|truncatechars:40 }}{% endif %}</td>
         <td>{{ p.cliente_nombre }}<br><small>{{ p.cliente_ciudad }} · {{ p.cantidad }} und.</small><br><a href="{% url 'conversacion_pedido' p.id %}">Abrir pedido</a></td>
         <td>{{ p.get_estado_pago_display }}</td>
         <td>${{ p.monto_cop }}</td>
