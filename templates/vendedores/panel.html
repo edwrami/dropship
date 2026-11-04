@@ -41,7 +41,7 @@
 
   {% if vendedor.tipo == "mayorista" or vendedor.tipo == "importador" %}
     <h3>Tiendas conectadas</h3>
-    <p class="muted">Publica cada producto con precio al por mayor, cantidad mínima y especificaciones. Las fotos son opcionales. El establecimiento suma productos y cantidades. A ese total se le suman tu porcentaje al por mayor y la tarifa de Wompi. A ti te queda el precio de la lista. El pedido se descarga en Word para bodega. El teléfono sigue oculto hasta el pedido.</p>
+    <p class="muted">Publica cada producto con precio al por mayor, cantidad mínima y especificaciones. Las fotos son opcionales. El establecimiento suma productos y cantidades. A ese total se le suman tu porcentaje al por mayor y la tarifa de Wompi. A ti te queda el precio de la lista. El pedido se descarga en Word para bodega. El teléfono aparece para el cliente cuando la transferencia queda aprobada.</p>
     <table>
       <tr><th>Tienda</th><th>Ciudad</th><th>Desde</th></tr>
       {% for c in conexiones %}

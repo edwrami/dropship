@@ -9,6 +9,7 @@
       <p>Total: ${{ pedido.monto_cop }} COP</p>
       <p>Referencia: {{ pedido.referencia_pago }}{% if pedido.metodo_pago %} · {{ pedido.metodo_pago }}{% endif %}</p>
       <p>El pago quedó amarrado a este pedido.</p>
+      {% include "vendedores/_contacto.html" %}
     {% elif reportado %}
       <h2>Pedido #{{ pedido.id }} · pago en proceso</h2>
       <p>Monto ${{ pedido.monto_cop }} COP · ref. {{ pedido.referencia_pago }}</p>

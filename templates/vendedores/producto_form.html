@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <h2>{% if producto %}Editar producto{% else %}Publicar producto{% endif %}</h2>
-  <p class="muted">Completa la ficha: categoría, descripción, ciudad, precio y tiempo de entrega. El cliente no ve tu costo ni tu teléfono.</p>
+  <p class="muted">Completa la ficha: categoría, descripción, ciudad, precio y tiempo de entrega. El cliente no ve tu costo. Tu teléfono aparece en el pedido cuando la transferencia queda aprobada.</p>
   {% include "vendedores/_descuento.html" %}
   <form method="post" enctype="multipart/form-data" style="max-width:720px">{% csrf_token %}
     {{ form.as_p }}

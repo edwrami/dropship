@@ -1,14 +1,14 @@
 {% if contacto_visible and pedido.contacto_telefono %}
   <div class="card" style="max-width:520px">
     <h3>Contacto del vendedor</h3>
-    <p>Este pedido ya quedó hecho. El teléfono, WhatsApp, correo y dirección no se muestran en el catálogo.</p>
-    {% if pedido.vendedor %}<p>Tienda: <strong>{{ pedido.vendedor.nombre_tienda }}</strong></p>{% endif %}
-    <p>Responsable: {{ pedido.contacto_responsable }}</p>
+    <p>La transferencia ya quedó aprobada. Estos datos son de la tienda, sea mayorista o detallista, y no aparecen en el catálogo.</p>
+    {% if pedido.vendedor %}<p>Tienda: <strong>{{ pedido.vendedor.nombre_tienda }}</strong> · {{ pedido.vendedor.get_tipo_display }}</p>{% endif %}
+    {% if pedido.contacto_responsable %}<p>Responsable: {{ pedido.contacto_responsable }}</p>{% endif %}
     <p>Teléfono: {{ pedido.contacto_telefono }}</p>
-    <p>WhatsApp: {{ pedido.contacto_whatsapp }}</p>
-    <p>Correo: {{ pedido.contacto_email }}</p>
-    <p>Dirección: {{ pedido.contacto_direccion }}</p>
+    {% if pedido.contacto_whatsapp %}<p>WhatsApp: {{ pedido.contacto_whatsapp }}</p>{% endif %}
+    {% if pedido.contacto_email %}<p>Correo: {{ pedido.contacto_email }}</p>{% endif %}
+    {% if pedido.contacto_direccion %}<p>Dirección: {{ pedido.contacto_direccion }}</p>{% endif %}
   </div>
 {% elif pedido.vendedor %}
-  <p class="aviso">El contacto del vendedor solo aparece en el navegador donde se hizo el pedido.</p>
+  <p class="aviso">El teléfono, WhatsApp, correo y dirección del vendedor aparecen aquí cuando la transferencia quede aprobada. Hasta entonces no se ven, ni en mayorista ni en detallista.</p>
 {% endif %}

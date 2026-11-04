@@ -4,7 +4,7 @@
 {% block content %}
   <p class="kicker">{{ proveedor.get_tipo_display }} · {{ proveedor.ciudad }}</p>
   <h2>{{ proveedor.nombre_tienda }}</h2>
-  <p class="muted">Elige productos y cantidades. La suma cambia al escribir y, al guardarla, queda en tu cuenta para consultarla después. El teléfono del proveedor sigue oculto hasta el pedido.</p>
+  <p class="muted">Elige productos y cantidades. La suma cambia al escribir y, al guardarla, queda en tu cuenta para consultarla después. El teléfono del proveedor aparece cuando la transferencia queda aprobada.</p>
   <p>
     <a class="btn sec" href="{% url 'proveedores_mayor' %}">Volver a proveedores</a>
     <a class="btn sec" href="{% url 'tienda_publica' proveedor.slug %}">Ver tienda pública</a>

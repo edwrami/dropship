@@ -42,6 +42,17 @@ def docx_bodega(pedido):
     if pedido.vendedor_id:
         documento.add_heading("Proveedor", level=2)
         documento.add_paragraph(f"{pedido.vendedor.nombre_tienda} · {pedido.vendedor.ciudad}")
+        if pedido.estado_pago == "aprobado" and pedido.contacto_telefono:
+            documento.add_paragraph(f"Responsable: {pedido.contacto_responsable}")
+            documento.add_paragraph(f"Teléfono: {pedido.contacto_telefono}")
+            if pedido.contacto_whatsapp:
+                documento.add_paragraph(f"WhatsApp: {pedido.contacto_whatsapp}")
+            if pedido.contacto_email:
+                documento.add_paragraph(f"Correo: {pedido.contacto_email}")
+            if pedido.contacto_direccion:
+                documento.add_paragraph(f"Dirección: {pedido.contacto_direccion}")
+        else:
+            documento.add_paragraph("El teléfono del proveedor aparece cuando la transferencia quede aprobada.")
 
     documento.add_heading("Productos", level=2)
     tabla = documento.add_table(rows=1, cols=5)

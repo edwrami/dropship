@@ -96,8 +96,28 @@ def _marcar_contacto(request, pedido):
 
 
 def contacto_visible(request, pedido):
-    if not pedido or not pedido.vendedor_id:
+    """El teléfono del vendedor, mayorista o detallista, sale cuando la transferencia ya está aprobada."""
+    if not pedido or not pedido.vendedor_id or pedido.estado_pago != "aprobado":
         return False
+    if request.user.is_authenticated and request.user.is_staff:
+        return True
+    if request.user.is_authenticated:
+        from vendedores.models import ClienteTienda, Comprador, Vendedor
+        try:
+            if request.user.vendedor.id == pedido.vendedor_id:
+                return True
+        except Vendedor.DoesNotExist:
+            pass
+        try:
+            if pedido.cliente_tienda_id and request.user.cliente_tienda.id == pedido.cliente_tienda_id:
+                return True
+        except ClienteTienda.DoesNotExist:
+            pass
+        try:
+            if pedido.comprador_id and request.user.comprador.id == pedido.comprador_id:
+                return True
+        except Comprador.DoesNotExist:
+            pass
     clave = (request.GET.get("clave") or "").strip()
     if clave and clave == pedido.clave_contacto:
         _marcar_contacto(request, pedido)
@@ -207,8 +227,8 @@ def crear_pedido(request, producto_id):
             autor="plataforma",
             nombre="ERA shop",
             texto=(
-                "Pedido creado. Esta conversación es el canal entre la tienda y el cliente: "
-                "dudas, entrega y estado van aquí, no por WhatsApp ni por teléfono."
+                "Pedido creado. El teléfono, WhatsApp, correo y dirección del vendedor "
+                "aparecen en este pedido cuando la transferencia quede aprobada."
             ),
         )
         if producto.controla_stock:
@@ -253,6 +273,8 @@ def _ctx_pago(pedido, request=None):
     }
     if request is not None and ctx["tarjeta_lista"]:
         destino = request.build_absolute_uri(reverse("resultado_pago", args=[pedido.id]))
+        if pedido.clave_contacto:
+            destino = f"{destino}?clave={pedido.clave_contacto}"
         ctx["wompi"] = wompi.contexto_widget(pedido, destino)
     return ctx
 
@@ -433,6 +455,7 @@ def conversacion_pedido(request, pedido_id):
         "reclamos": pedido.reclamos.all(),
         "dias_reclamo": settings.DIAS_RECLAMO,
         "puede_devolver": _puede_devolver(pedido),
+        "contacto_visible": contacto_visible(request, pedido),
     })
 
 

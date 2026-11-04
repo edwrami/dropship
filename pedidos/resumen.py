@@ -55,6 +55,15 @@ def pdf_pedido(pedido):
         lineas.append(f"Entregado a: {pedido.entrega_recibio}")
     if pedido.vendedor_id:
         lineas.append(f"Tienda: {pedido.vendedor.nombre_tienda} · {pedido.vendedor.ciudad}")
+    if pedido.estado_pago == "aprobado" and pedido.contacto_telefono:
+        lineas.append(f"Contacto: {pedido.contacto_responsable}")
+        lineas.append(f"Telefono: {pedido.contacto_telefono}")
+        if pedido.contacto_whatsapp:
+            lineas.append(f"WhatsApp: {pedido.contacto_whatsapp}")
+        if pedido.contacto_email:
+            lineas.append(f"Correo: {pedido.contacto_email}")
+        if pedido.contacto_direccion:
+            lineas.append(f"Direccion tienda: {pedido.contacto_direccion[:90]}")
     lineas.append(f"Cliente: {pedido.cliente_nombre}")
     if pedido.cliente_documento:
         lineas.append(f"Cedula: {pedido.cliente_documento}")

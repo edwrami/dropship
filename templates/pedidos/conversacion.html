@@ -23,7 +23,8 @@
   {% if pedido.vendedor %}
     <p>Tienda: <strong>{{ pedido.vendedor.nombre_tienda }}</strong> · {{ pedido.vendedor.get_tipo_display }} · {{ pedido.vendedor.ciudad }}</p>
   {% endif %}
-  <p class="note">Esta conversación es el canal. Las dudas, la entrega y el estado se hablan aquí, no por fuera.</p>
+  {% include "vendedores/_contacto.html" %}
+  <p class="note">Esta conversación es el canal del pedido. El teléfono del vendedor aparece cuando la transferencia queda aprobada.</p>
   <p><a class="btn sec" href="{% url 'resumen_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar resumen</a>
     {% if pedido.es_mayor %}<a class="btn" href="{% url 'bodega_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar para bodega (Word)</a>{% endif %}
     {% if rol == "cliente" %}<a class="btn sec" href="{% url 'historial_comprador' %}">Ver mi historial</a>{% endif %}

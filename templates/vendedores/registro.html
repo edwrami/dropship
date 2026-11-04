@@ -2,7 +2,7 @@
 {% block content %}
   <h2>Registro de vendedor</h2>
   {% include "vendedores/_descuento.html" %}
-  <p class="muted">El cliente ve tu ciudad y el nombre de la tienda. El teléfono y el Nequi no salen en el catálogo. Las dudas y la entrega se hablan dentro del pedido.</p>
+  <p class="muted">El cliente ve tu ciudad y el nombre de la tienda. El teléfono, WhatsApp, correo y dirección no salen en el catálogo: aparecen en el pedido cuando la transferencia queda aprobada.</p>
   <form method="post">{% csrf_token %}
     {{ form.as_p }}
     {% include "vendedores/_categorias.html" %}
