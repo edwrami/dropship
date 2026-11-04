@@ -40,6 +40,8 @@ def _decimal(valor):
 
 
 def lista_productos(request):
+    from pedidos.services.visitas import registrar_visita
+    registrar_visita(request)
     aplicar_sanciones()
     qs = _catalogo()
     g = request.GET
@@ -210,6 +212,27 @@ def detalle_producto(request, pk):
         raise Http404("Producto no disponible")
     if producto.controla_stock and producto.stock <= 0:
         raise Http404("Producto agotado")
+    from django.core.exceptions import ObjectDoesNotExist
+    from django.db.models import Avg, Count
+
+    from pedidos.services.visitas import registrar_visita
+    producto_id = producto.pk
+    if producto.vendedor_id and request.user.is_authenticated:
+        try:
+            if request.user.vendedor.pk == producto.vendedor_id:
+                producto_id = None
+        except ObjectDoesNotExist:
+            pass
+    if "producto" in registrar_visita(request, producto_id=producto_id):
+        producto.visitas += 1
+    nota_tienda = None
+    total_notas = 0
+    if producto.vendedor_id:
+        notas = producto.vendedor.calificaciones.aggregate(promedio=Avg("estrellas"), total=Count("id"))
+        nota_tienda = producto.vendedor.calificacion_manual
+        if nota_tienda is None:
+            nota_tienda = notas["promedio"]
+        total_notas = notas["total"]
     ve_mayor = False
     cliente = None
     if request.user.is_authenticated:
@@ -226,6 +249,8 @@ def detalle_producto(request, pk):
         "producto": producto,
         "error": "",
         "ve_mayor": ve_mayor,
+        "nota_tienda": nota_tienda,
+        "total_notas": total_notas,
     })
 
 

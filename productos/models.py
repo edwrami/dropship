@@ -66,6 +66,7 @@ class Producto(models.Model):
 
     dsers_product_id = models.CharField(max_length=120, blank=True)
 
+    visitas = models.PositiveIntegerField(default=0)
     activo = models.BooleanField(default=True)
     ultima_sincronizacion = models.DateTimeField(auto_now=True)
     creado = models.DateTimeField(auto_now_add=True)

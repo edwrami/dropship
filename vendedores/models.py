@@ -52,6 +52,11 @@ class Vendedor(models.Model):
     motivo_sancion = models.TextField(blank=True)
     fecha_sancion = models.DateTimeField(null=True, blank=True)
     acepta_terminos = models.BooleanField(default=False)
+    visitas = models.PositiveIntegerField(default=0)
+    calificacion_manual = models.DecimalField(
+        max_digits=3, decimal_places=1, null=True, blank=True,
+        help_text="Si tiene valor, esta es la calificación que ve el público. Vacío usa el promedio de los comentarios.",
+    )
     creado = models.DateTimeField(auto_now_add=True)
 
     class Meta:

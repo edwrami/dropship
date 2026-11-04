@@ -16,7 +16,9 @@
     <p>Tienda: <strong>{{ pedido.vendedor.nombre_tienda }}</strong> · {{ pedido.vendedor.get_tipo_display }} · {{ pedido.vendedor.ciudad }}</p>
   {% endif %}
   <p class="note">Esta conversación es el canal. Las dudas, la entrega y el estado se hablan aquí, no por fuera.</p>
-  <p><a class="btn sec" href="{% url 'resumen_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar resumen</a></p>
+  <p><a class="btn sec" href="{% url 'resumen_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar resumen</a>
+    {% if rol == "cliente" %}<a class="btn sec" href="{% url 'historial_comprador' %}">Ver mi historial</a>{% endif %}
+  </p>
 
   {% if rol == "vendedor" or rol == "plataforma" %}
     <div class="card">

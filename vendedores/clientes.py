@@ -7,6 +7,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from pedidos.models import Pedido
+
 from .forms import RegistroClienteForm
 from .models import ClienteTienda, Conexion, Vendedor
 from .opciones import DEPARTAMENTOS, TIPOS_PROVEEDOR
@@ -153,15 +155,41 @@ def lista_mayorista(request, slug):
     })
 
 
+def pedidos_del_comprador(request, cliente):
+    ids = []
+    for valor in request.session.get("pedidos_contacto") or []:
+        try:
+            ids.append(int(valor))
+        except (TypeError, ValueError):
+            continue
+    if cliente is None and not ids:
+        return Pedido.objects.none()
+    consulta = Q(pk__in=ids) if ids else Q(pk__isnull=True)
+    if cliente is not None:
+        consulta |= Q(cliente_tienda=cliente)
+        email = (cliente.user.email or "").strip()
+        if email:
+            consulta |= Q(cliente_email__iexact=email)
+    return Pedido.objects.filter(consulta).select_related("producto", "vendedor")
+
+
+def historial_comprador(request):
+    cliente = _cliente(request.user)
+    if cliente is not None:
+        return redirect("mis_proveedores")
+    return render(request, "clientes/historial.html", {
+        "pedidos": pedidos_del_comprador(request, None),
+    })
+
+
 @login_required(login_url="entrar_cliente")
 def mis_proveedores(request):
     cliente = _cliente(request.user)
     if cliente is None:
         return redirect("registro_cliente")
     conexiones = cliente.conexiones.select_related("proveedor").order_by("proveedor__nombre_tienda")
-    pedidos = cliente.pedidos.select_related("producto", "vendedor")
     return render(request, "clientes/mios.html", {
         "cliente": cliente,
         "conexiones": conexiones,
-        "pedidos": pedidos,
+        "pedidos": pedidos_del_comprador(request, cliente),
     })

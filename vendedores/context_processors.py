@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
+from pedidos.models import CuentaPlataforma
+
 
 def marketplace(request):
     vendedor = None
@@ -24,4 +26,5 @@ def marketplace(request):
         "dias_liquidacion": getattr(settings, "DIAS_LIQUIDACION", 5),
         "vendedor_actual": vendedor,
         "cliente_actual": cliente,
+        "visitas_sitio": CuentaPlataforma.objects.filter(pk=1).values_list("visitas", flat=True).first() or 0,
     }

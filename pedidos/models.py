@@ -209,6 +209,7 @@ class CuentaPlataforma(models.Model):
     payouts_api_key = models.CharField(max_length=200, blank=True)
     payouts_user_id = models.CharField(max_length=80, blank=True)
     payouts_account_id = models.CharField(max_length=80, blank=True)
+    visitas = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "cuenta de comisiones"

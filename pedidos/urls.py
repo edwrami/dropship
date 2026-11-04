@@ -1,8 +1,10 @@
 ﻿from django.urls import path
-from . import views
+
+from . import reputacion, views
 
 urlpatterns = [
     path("", views.lista_pedidos, name="lista_pedidos"),
+    path("reputacion/", reputacion.reputacion, name="reputacion"),
     path("crear/<int:producto_id>/", views.crear_pedido, name="crear_pedido"),
     path("<int:pedido_id>/", views.conversacion_pedido, name="conversacion_pedido"),
     path("<int:pedido_id>/resumen.pdf", views.resumen_pedido, name="resumen_pedido"),

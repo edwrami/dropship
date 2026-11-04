@@ -10,6 +10,7 @@
   <aside class="hero-card">
     <p>Hoy en el catálogo</p>
     <strong>{% if total == 1 %}1 producto{% else %}{{ total }} productos{% endif %}</strong>
+    <p>{{ visitas_sitio|intcomma }} visitas en ERA shop</p>
     <p>Ciudad, precio, entrega y tipo de vendedor en un solo filtro.</p>
   </aside>
 </section>
@@ -114,6 +115,7 @@
           {% if p.entrega_texto %} · {{ p.entrega_texto }}{% endif %}
           {% if p.envio_gratis %} · Envío gratis{% endif %}
           {% if p.vendedor %}<br>{{ p.vendedor.nombre_tienda }}{% endif %}
+          <br>{{ p.visitas|intcomma }} visitas
         </p>
         <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir</a>
       </div>

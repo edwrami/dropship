@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Visitas y calificaciones · ERA shop{% endblock %}
+{% block content %}
+  <p class="kicker">ERA shop</p>
+  <h2>Visitas y calificaciones</h2>
+  <p class="muted">El número que guardas es el que ve el público. Las visitas nuevas se suman encima. Si dejas la calificación vacía, la página muestra el promedio de los comentarios.</p>
+  <p><a class="btn sec" href="{% url 'lista_pedidos' %}">Volver a ventas</a></p>
+
+  <form method="post" class="card" style="max-width:420px">{% csrf_token %}
+    <input type="hidden" name="accion" value="sitio">
+    <label>Visitas de ERA shop<input name="visitas" type="number" min="0" value="{{ cuenta.visitas }}" required></label>
+    <button class="btn" type="submit">Guardar visitas de la página</button>
+  </form>
+
+  <form method="get" class="card" style="max-width:420px">
+    <label>Buscar tienda, producto o comentario<input name="q" value="{{ q }}"></label>
+    <button class="btn" type="submit">Buscar</button>
+  </form>
+
+  <h3>Tiendas</h3>
+  <table>
+    <tr><th>Tienda</th><th>Se ve</th><th>Comentarios</th><th>Ajustar</th></tr>
+    {% for v in vendedores %}
+      <tr>
+        <td>{% if v.slug %}<a href="{% url 'tienda_publica' v.slug %}">{{ v.nombre_tienda }}</a>{% else %}{{ v.nombre_tienda }}{% endif %}</td>
+        <td>{% if v.calificacion_manual is not None %}{{ v.calificacion_manual|floatformat:1 }}{% elif v.promedio %}{{ v.promedio|floatformat:1 }}{% else %}—{% endif %}</td>
+        <td>{{ v.total_notas }}</td>
+        <td>
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="accion" value="vendedor">
+            <input type="hidden" name="id" value="{{ v.id }}">
+            <label>Visitas<input name="visitas" type="number" min="0" value="{{ v.visitas }}" required></label>
+            <label>Calificación<input name="nota" value="{% if v.calificacion_manual is not None %}{{ v.calificacion_manual }}{% endif %}" placeholder="Vacío usa el promedio"></label>
+            <button class="btn" type="submit">Guardar</button>
+          </form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4">No hay tiendas con esa búsqueda.</td></tr>
+    {% endfor %}
+  </table>
+
+  <h3>Productos</h3>
+  <table>
+    <tr><th>Producto</th><th>Tienda</th><th>Visitas</th></tr>
+    {% for p in productos %}
+      <tr>
+        <td>{% if p.activo %}<a href="{% url 'detalle_producto' p.pk %}">{{ p.titulo|truncatechars:48 }}</a>{% else %}{{ p.titulo|truncatechars:48 }} · oculto{% endif %}</td>
+        <td>{% if p.vendedor %}{{ p.vendedor.nombre_tienda }}{% else %}ERA shop{% endif %}</td>
+        <td>
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="accion" value="producto">
+            <input type="hidden" name="id" value="{{ p.id }}">
+            <input name="visitas" type="number" min="0" value="{{ p.visitas }}" required>
+            <button class="btn sec" type="submit">Guardar</button>
+          </form>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="3">No hay productos con esa búsqueda.</td></tr>
+    {% endfor %}
+  </table>
+  {% if productos.has_other_pages %}
+    <p>
+      {% if productos.has_previous %}
+        <a class="btn sec" href="?{% if q %}q={{ q|urlencode }}&{% endif %}pagina={{ productos.previous_page_number }}">Anterior</a>
+      {% endif %}
+      {% if productos.has_next %}
+        <a class="btn sec" href="?{% if q %}q={{ q|urlencode }}&{% endif %}pagina={{ productos.next_page_number }}">Siguiente</a>
+      {% endif %}
+    </p>
+  {% endif %}
+
+  <h3>Comentarios</h3>
+  {% for c in comentarios %}
+    <article class="card">
+      <p><strong>{{ c.vendedor.nombre_tienda }}</strong> · {{ c.pedido.cliente_nombre }} · pedido #{{ c.pedido_id }} · {{ c.creado|date:"d/m/Y" }}</p>
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="accion" value="comentario">
+        <input type="hidden" name="id" value="{{ c.id }}">
+        <label>Estrellas<input name="estrellas" type="number" min="1" max="5" value="{{ c.estrellas }}" required></label>
+        <label>Comentario<textarea name="comentario" rows="3">{{ c.comentario }}</textarea></label>
+        <button class="btn" type="submit">Guardar comentario</button>
+      </form>
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="accion" value="borrar_comentario">
+        <input type="hidden" name="id" value="{{ c.id }}">
+        <button class="btn sec" type="submit">Borrar comentario</button>
+      </form>
+    </article>
+  {% empty %}
+    <p>No hay comentarios con esa búsqueda.</p>
+  {% endfor %}
+{% endblock %}

@@ -10,4 +10,5 @@ urlpatterns = [
     path("proveedores/<slug:slug>/desconectar/", clientes.desconectar_proveedor, name="desconectar_proveedor"),
     path("proveedores/<slug:slug>/lista/", clientes.lista_mayorista, name="lista_mayorista"),
     path("mis-proveedores/", clientes.mis_proveedores, name="mis_proveedores"),
+    path("historial/", clientes.historial_comprador, name="historial_comprador"),
 ]

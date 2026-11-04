@@ -29,10 +29,12 @@
     {% elif producto.precio_mayor_cop %}
       <p class="note">Hay precio al por mayor{% if producto.cantidad_minima %} desde {{ producto.cantidad_minima }} unidades{% endif %}. <a href="{% url 'proveedores_mayor' %}">Registra tu tienda y conéctate</a> para verlo.</p>
     {% endif %}
+    <p class="meta">{{ producto.visitas|intcomma }} visitas</p>
     {% if producto.vendedor %}
       <p>Vendido por <a href="{% url 'tienda_publica' producto.vendedor.slug %}"><strong>{{ producto.vendedor.nombre_tienda }}</strong></a>
         · {{ producto.vendedor.get_tipo_display }}
         {% if producto.ciudad_despacho %} · {{ producto.ciudad_despacho }}{% endif %}
+        {% if nota_tienda %} · {{ nota_tienda|floatformat:1 }} de 5{% if total_notas %} · {{ total_notas }} comentarios{% endif %}{% endif %}
       </p>
       <p class="note">Cuando haces el pedido, la conversación queda en esa ficha. No se habla por fuera de la página.</p>
     {% endif %}

@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Avg, Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -124,12 +124,17 @@ def panel(request):
     deuda = pedidos.filter(estado_comision__in=["pendiente", "reportada"]).aggregate(
         s=Sum("comision_cop")
     )["s"] or 0
+    notas = vendedor.calificaciones.aggregate(promedio=Avg("estrellas"), total=Count("id"))
+    nota_publica = vendedor.calificacion_manual if vendedor.calificacion_manual is not None else notas["promedio"]
     return render(request, "vendedores/panel.html", {
         "vendedor": vendedor,
         "productos": productos,
         "pedidos": pedidos,
         "deuda": deuda,
         "conexiones": conexiones,
+        "nota_publica": nota_publica,
+        "total_notas": notas["total"],
+        "comentarios": vendedor.calificaciones.select_related("pedido").order_by("-creado")[:20],
     })
 
 
@@ -351,8 +356,10 @@ def cancelar_pedido(request, pk):
 
 
 def tienda_publica(request, slug):
-    from django.db.models import Avg, Count
+    from pedidos.services.visitas import registrar_visita
     vendedor = get_object_or_404(Vendedor, slug=slug, estado="activo")
+    if "vendedor" in registrar_visita(request, vendedor_id=vendedor.id):
+        vendedor.visitas += 1
     notas = vendedor.calificaciones.aggregate(promedio=Avg("estrellas"), total=Count("id"))
     productos = (
         vendedor.productos.filter(activo=True)
@@ -365,6 +372,8 @@ def tienda_publica(request, slug):
         "productos": productos,
         "promedio": notas["promedio"],
         "total_calificaciones": notas["total"],
+        "nota_publica": vendedor.calificacion_manual if vendedor.calificacion_manual is not None else notas["promedio"],
+        "comentarios": vendedor.calificaciones.select_related("pedido").order_by("-creado")[:40],
     })
 
 

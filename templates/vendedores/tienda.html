@@ -15,7 +15,8 @@
     <p class="eyebrow">{{ tienda.get_tipo_display }} · {{ tienda.ciudad }}</p>
     <h1>{{ tienda.nombre_tienda }}</h1>
     <p class="lede">Elige un producto y pide. La conversación queda dentro del pedido.</p>
-    <p class="meta">{% if total_calificaciones %}{{ promedio|floatformat:1 }} de 5 · {{ total_calificaciones }} calificaciones{% else %}Sin calificaciones todavía{% endif %}</p>
+    <p class="meta">{{ tienda.visitas|intcomma }} visitas</p>
+    <p class="meta">{% if nota_publica %}{{ nota_publica|floatformat:1 }} de 5{% else %}Sin calificación todavía{% endif %}{% if total_calificaciones %} · {{ total_calificaciones }} comentarios{% endif %}</p>
   </div>
   <aside class="hero-card">
     <p>Rango de la tienda</p>
@@ -41,7 +42,7 @@
         {% else %}
           <p class="price">${{ p.precio_final_cop|floatformat:0|intcomma }}</p>
         {% endif %}
-        <p class="meta">{% if p.entrega_texto %}Entrega {{ p.entrega_texto }}{% endif %}</p>
+        <p class="meta">{% if p.entrega_texto %}Entrega {{ p.entrega_texto }} · {% endif %}{{ p.visitas|intcomma }} visitas</p>
         <a class="btn" href="{% url 'detalle_producto' p.pk %}">Pedir</a>
       </div>
     </article>
@@ -49,4 +50,13 @@
     <p>Esta tienda todavía no tiene productos visibles.</p>
   {% endfor %}
 </div>
+<h2>Comentarios</h2>
+{% for c in comentarios %}
+  <article class="card">
+    <p><strong>{{ c.estrellas }} de 5</strong> · {{ c.pedido.cliente_nombre }} · {{ c.creado|date:"d/m/Y" }}</p>
+    {% if c.comentario %}<p>{{ c.comentario }}</p>{% endif %}
+  </article>
+{% empty %}
+  <p>Esta tienda todavía no tiene comentarios.</p>
+{% endfor %}
 {% endblock %}
