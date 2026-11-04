@@ -3,7 +3,7 @@
 <section>
   <p class="eyebrow">Destacados</p>
   <h2>Económicos y buscados</h2>
-  <p class="muted">Arrastra hacia el lado para verlos. {% if tienda %}Son de {{ tienda.nombre_tienda }}.{% else %}Salen de varias tiendas.{% endif %}</p>
+  <p class="muted">Arrastra hacia el lado para verlos. {% if tienda %}Son de {{ tienda.nombre_tienda }}.{% elif varias %}Salen de varias tiendas.{% else %}Salen de la tienda.{% endif %}</p>
   <div class="rail" data-rail>
     {% for p in carrusel %}
       <article>

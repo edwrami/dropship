@@ -16,7 +16,7 @@
 <section class="hero">
   <div>
     <p class="eyebrow">ERA shop</p>
-    <h1>{% if tienda %}{{ tienda.nombre_tienda }}{% else %}Varias tiendas{% endif %}</h1>
+    <h1>{% if tienda %}{{ tienda.nombre_tienda }}{% elif varias %}Varias tiendas{% else %}ERA shop{% endif %}</h1>
     <p class="lede">Estos son productos económicos y buscados. Arrastra el carrusel para verlos. Si entras a la tienda ves todo su catálogo. Si das Comprar, el producto queda en el carrito y puedes juntar varias tiendas en un solo pago.</p>
   </div>
 </section>

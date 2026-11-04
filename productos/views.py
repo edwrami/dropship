@@ -151,6 +151,14 @@ def opciones_busqueda():
     }
 
 
+def _en_tiendas(qs):
+    return qs.filter(vendedor__isnull=False, vendedor__estado="activo").exclude(vendedor__slug="")
+
+
+def _cuenta_tiendas(qs):
+    return qs.values("vendedor_id").distinct().count()
+
+
 def mezcla_carrusel(qs, limite=8):
     """Económicos y buscados, de una tienda o de varias, sin repetir."""
     baratos = list(qs.order_by("precio_final_cop", "-visitas")[:limite])
@@ -167,7 +175,7 @@ def mezcla_carrusel(qs, limite=8):
 
 def vitrina_comprador(request):
     """Productos del panel. Con filtros, respeta la búsqueda. Sin filtros, mezcla tiendas al azar."""
-    qs = catalogo_filtrado(request)
+    qs = _en_tiendas(catalogo_filtrado(request))
     params = request.GET.copy()
     params.pop("page", None)
     if hay_filtros(request):
@@ -175,11 +183,13 @@ def vitrina_comprador(request):
         productos = pagina.object_list
         total = pagina.paginator.count
         aleatorio = False
+        carrusel_qs = qs
     else:
         pagina = None
         productos = list(qs.order_by("?")[:24])
         total = len(productos)
         aleatorio = True
+        carrusel_qs = _en_tiendas(_catalogo())
     datos = opciones_busqueda()
     datos.update({
         "productos": productos,
@@ -187,7 +197,8 @@ def vitrina_comprador(request):
         "total": total,
         "aleatorio": aleatorio,
         "filtros_qs": params.urlencode(),
-        "carrusel": mezcla_carrusel(catalogo_filtrado(request) if hay_filtros(request) else _catalogo()),
+        "carrusel": mezcla_carrusel(carrusel_qs),
+        "varias": _cuenta_tiendas(carrusel_qs) > 1,
     })
     return datos
 
@@ -201,13 +212,14 @@ def lista_productos(request):
     pagina = Paginator(qs, 24).get_page(request.GET.get("page"))
     params = request.GET.copy()
     params.pop("page", None)
+    de_tiendas = _en_tiendas(_catalogo())
     ctx = opciones_busqueda()
     ctx.update({
         "productos": pagina,
         "total": total,
         "filtros_qs": params.urlencode(),
-        "carrusel": mezcla_carrusel(_catalogo()),
-        "carrusel_varias": True,
+        "carrusel": mezcla_carrusel(de_tiendas),
+        "varias": _cuenta_tiendas(de_tiendas) > 1,
     })
     return render(request, "productos/lista.html", ctx)
 
@@ -215,7 +227,7 @@ def lista_productos(request):
 def carrusel_facebook(request):
     from pedidos.services.visitas import registrar_visita
     registrar_visita(request)
-    qs = _catalogo()
+    qs = _en_tiendas(_catalogo())
     slug = (request.GET.get("tienda") or "").strip()
     tienda = None
     if slug:
@@ -225,7 +237,7 @@ def carrusel_facebook(request):
     return render(request, "productos/facebook.html", {
         "carrusel": mezcla_carrusel(qs, 12),
         "tienda": tienda,
-        "varias": tienda is None,
+        "varias": tienda is None and _cuenta_tiendas(qs) > 1,
     })
 
 
