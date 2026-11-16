@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Mi servicio · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Oferente</p>
+<h2>{{ oferente.nombre }}</h2>
+<p class="meta">{{ oferente.oficio_texto }} · {{ oferente.ciudad }} · {{ oferente.get_estado_display }}</p>
+<p>
+  <a class="btn sec" href="{% url 'ficha_oferente' %}">Ficha</a>
+  <a class="btn sec" href="{% url 'horarios_oferente' %}">Agenda</a>
+  <a class="btn sec" href="{% url 'fotos_oferente' %}">Fotos ({{ fotos|length }}/10)</a>
+  <a class="btn sec" href="{% url 'ampliar_oferente' %}">Otra ciudad u oficio</a>
+  {% if oferente.estado != "activo" %}
+    <a class="btn" href="{% url 'activar_oferente' %}">Pagar ${{ cuota|floatformat:0|intcomma }} para aparecer</a>
+  {% else %}
+    <a class="btn sec" href="{% url 'detalle_oferente' oferente.slug %}">Ver página pública</a>
+  {% endif %}
+  <a class="btn sec" href="{% url 'salir_oferente' %}">Salir</a>
+</p>
+{% if oferente.estado != "activo" %}
+  <div class="note">Todavía no apareces. Paga la cuota de ${{ cuota|floatformat:0|intcomma }} por Wompi.</div>
+{% endif %}
+
+<h3>Dónde apareces</h3>
+<p class="muted">{% for c in coberturas %}{{ c.municipio }}{% if c.activa %} (activo){% else %} (falta pago){% endif %}{% if not forloop.last %} · {% endif %}{% empty %}Aún no.{% endfor %}</p>
+<h3>Oficios</h3>
+<p class="muted">{% for e in especialidades %}{{ e.oficio_texto }}{% if e.activa %} (activo){% else %} (falta pago){% endif %}{% if not forloop.last %} · {% endif %}{% empty %}Aún no.{% endfor %}</p>
+<p class="note">El cliente paga la cita. El giro a tu Nequi sale cuando él marca el trabajo como realizado.</p>
+
+<h3>Cotizaciones</h3>
+{% if consultas %}
+  <ul>
+    {% for q in consultas %}
+      <li>
+        <a href="{% url 'consulta_servicio' q.id %}?clave={{ q.clave }}">{{ q.cliente_nombre }} · {{ q.especialidad.oficio_texto|default:oferente.oficio_texto }} · {{ q.creado|date:"d/m H:i" }}</a>
+        {% if not q.visto_oferente %}<strong>nuevo</strong>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="muted">Cuando alguien pregunte el precio, te vibra el celular si dejas esta página abierta o los avisos del navegador.</p>
+{% endif %}
+
+<h3>Citas</h3>
+{% if not citas %}
+  <p class="muted">Cuando un cliente elija un hueco y pague, la cita queda aquí con el pago registrado.</p>
+{% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>Cuando</th>
+        <th>Cliente</th>
+        <th>Pago</th>
+        <th>Contacto</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in citas %}
+        <tr>
+          <td>{{ c.inicio|date:"d/m/Y h:i a" }}</td>
+          <td>
+            {% if c.estado_pago == "aprobado" %}
+              {{ c.cliente_nombre }}<br>{{ c.cliente_telefono }}
+              {% if c.cliente_email %}<br>{{ c.cliente_email }}{% endif %}
+            {% else %}
+              Reservado · espera el pago
+            {% endif %}
+          </td>
+          <td>
+            ${{ c.monto_cop|floatformat:0|intcomma }} · {{ c.estado_pago }}
+            {% if c.trabajo_realizado %}<br><small>Trabajo realizado</small>{% elif c.estado_pago == "aprobado" %}<br><small>Espera que el cliente marque realizado</small>{% endif %}
+            {% if c.giro %}<br><small>Te llegan ${{ c.giro.monto_cop|floatformat:0|intcomma }} · {{ c.giro.get_estado_display }}</small>{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'resultado_cita' c.id %}?clave={{ c.clave_contacto }}">Abrir</a>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% endblock %}

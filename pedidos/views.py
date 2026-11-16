@@ -318,6 +318,10 @@ def wompi_evento(request):
     ref = (tx.get("reference") or "").strip()
     if not ref:
         return HttpResponse("ok")
+    from servicios.pagos import aplicar_transaccion as aplicar_servicio
+
+    if aplicar_servicio(tx):
+        return HttpResponse("ok")
     compra = Compra.objects.filter(referencia_pago=ref).first()
     if compra:
         for pedido in compra.pedidos.all():

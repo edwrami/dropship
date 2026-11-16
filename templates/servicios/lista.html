@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Servicios · ERA shop{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Servicios</p>
+    <h1>Quién te hace el trabajo</h1>
+    <p class="lede">Transporte, plomería, arreglos del hogar, veterinario de urgencias, salud, mecánica y el resto de oficios. Ves la ficha, la calificación y los huecos libres. El teléfono aparece cuando pagas la cita por Wompi.</p>
+    <p>
+      <a class="btn" href="{% url 'registro_oferente' %}">Ofrecer un servicio</a>
+      <a class="btn sec" href="{% url 'entrar_oferente' %}">Entrar como oferente</a>
+    </p>
+  </div>
+  <aside class="hero-card">
+    <p>Para aparecer</p>
+    <strong>${{ cuota|floatformat:0|intcomma }}</strong>
+    <p>Un oficio en un municipio. Cada ciudad o especialidad extra: otros ${{ cuota|floatformat:0|intcomma }}.</p>
+    <p>{% if total == 1 %}1 oferente visible{% else %}{{ total }} oferentes visibles{% endif %}</p>
+  </aside>
+</section>
+
+<details class="filters" open>
+  <summary>Buscar un oficio</summary>
+  <form class="filters-grid" method="get">
+    <label>Palabra<input name="q" value="{{ request.GET.q }}" placeholder="Oficio, nombre, ciudad"></label>
+    <label>Tipo
+      <select name="rubro" id="filtro-rubro">
+        <option value="">Todos</option>
+        {% for clave, nombre in rubros %}
+          <option value="{{ clave }}" {% if request.GET.rubro == clave %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Oficio
+      <select name="oficio" id="filtro-oficio">
+        <option value="">Todos</option>
+      </select>
+    </label>
+    <label>Departamento
+      <select name="departamento">
+        <option value="">Todos</option>
+        {% for d in departamentos %}
+          <option value="{{ d }}" {% if request.GET.departamento == d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Ciudad o municipio
+      <select name="municipio">
+        <option value="">Todas</option>
+      </select>
+    </label>
+    <label class="checks"><input type="checkbox" name="libres" value="1" {% if request.GET.libres %}checked{% endif %}> Agenda abierta</label>
+    <label class="checks"><input type="checkbox" name="calificados" value="1" {% if request.GET.calificados %}checked{% endif %}> Bien calificados</label>
+    <label class="checks"><input type="checkbox" name="satisfechos" value="1" {% if request.GET.satisfechos %}checked{% endif %}> Clientes satisfechos</label>
+    <p><button class="btn" type="submit">Filtrar</button></p>
+  </form>
+</details>
+
+{% if not oferentes %}
+  <p class="note">Todavía no hay oferentes visibles. Quien quiera aparecer paga ${{ cuota|floatformat:0|intcomma }} por Wompi.</p>
+{% else %}
+  <div class="catalog">
+    {% for o in oferentes %}
+      <article class="product">
+        <a class="media" href="{% url 'detalle_oferente' o.slug %}">
+          {% if o.foto_url %}<img src="{{ o.foto_url }}" alt="{{ o.nombre }}">{% endif %}
+        </a>
+        <div class="body">
+          <p class="kicker">{{ o.rubro_texto }}</p>
+          <h3><a href="{% url 'detalle_oferente' o.slug %}">{{ o.nombre }}</a></h3>
+          <p class="meta">{{ o.oficio_texto }} · {{ o.ciudad }}</p>
+          <p class="price">${{ o.precio_cop|floatformat:0|intcomma }} <span class="meta">{{ o.get_unidad_display }}</span></p>
+          <p class="meta">
+            {% if o.nota %}{{ o.nota|floatformat:1 }} de 5 · {{ o.opiniones }} comentario{{ o.opiniones|pluralize }}{% else %}Sin calificaciones{% endif %}
+          </p>
+          <p>
+            {% if o.disponible_ahora %}<span class="pill ok-pill">Agenda abierta</span>{% else %}<span class="pill">Sin agenda</span>{% endif %}
+          </p>
+          <a class="btn" href="{% url 'detalle_oferente' o.slug %}">Ver agenda</a>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% endif %}
+<script>
+(function () {
+  var mapa = {{ oficios_json|safe }};
+  var munis = {{ municipios_json|safe }};
+  var rubro = document.getElementById("filtro-rubro");
+  var oficio = document.getElementById("filtro-oficio");
+  var depto = document.querySelector('[name="departamento"]');
+  var muni = document.querySelector('[name="municipio"]');
+  var ofElegido = "{{ request.GET.oficio|escapejs }}";
+  var muElegido = "{{ request.GET.municipio|escapejs }}{{ request.GET.ciudad|escapejs }}";
+  function oficios() {
+    var lista = mapa[rubro.value] || [];
+    oficio.innerHTML = '<option value="">Todos</option>';
+    lista.forEach(function (par) {
+      var op = document.createElement("option");
+      op.value = par[0];
+      op.textContent = par[1];
+      if (par[0] === ofElegido) op.selected = true;
+      oficio.appendChild(op);
+    });
+  }
+  function ciudades() {
+    var lista = munis[depto.value] || [];
+    muni.innerHTML = '<option value="">Todas</option>';
+    lista.forEach(function (nombre) {
+      var op = document.createElement("option");
+      op.value = nombre;
+      op.textContent = nombre;
+      if (nombre === muElegido) op.selected = true;
+      muni.appendChild(op);
+    });
+  }
+  rubro.addEventListener("change", function () { ofElegido = ""; oficios(); });
+  depto.addEventListener("change", function () { muElegido = ""; ciudades(); });
+  oficios();
+  ciudades();
+})();
+</script>
+{% endblock %}

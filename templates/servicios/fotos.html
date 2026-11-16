@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Fotos de trabajos{% endblock %}
+{% block content %}
+<h2>Fotos de tus trabajos</h2>
+<p class="muted">Hasta 10 fotos. JPG, PNG o WEBP. Máximo 5 MB cada una.</p>
+<div class="thumbs">
+  {% for f in fotos %}
+    <form method="post" style="display:inline">{% csrf_token %}
+      <img src="{{ f.url }}" alt="Foto {{ f.orden }}">
+      <button class="btn sec" name="borrar" value="{{ f.id }}" type="submit">Quitar</button>
+    </form>
+  {% empty %}
+    <p class="muted">Aún no hay fotos.</p>
+  {% endfor %}
+</div>
+{% if fotos|length < 10 %}
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <label>Agregar fotos</label>
+    <input type="file" name="fotos" accept="image/jpeg,image/png,image/webp" multiple>
+    <p><button class="btn" type="submit">Subir</button>
+    <a class="btn sec" href="{% url 'panel_oferente' %}">Volver</a></p>
+  </form>
+{% else %}
+  <p class="note">Ya tienes 10 fotos.</p>
+  <p><a class="btn sec" href="{% url 'panel_oferente' %}">Volver</a></p>
+{% endif %}
+{% endblock %}

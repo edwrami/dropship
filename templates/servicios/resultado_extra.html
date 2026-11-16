@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Ampliación{% endblock %}
+{% block content %}
+{% if pagado %}
+  <h2>Ya quedó activo</h2>
+  <p>Esa ciudad o ese oficio ya aparece en tu ficha.</p>
+{% else %}
+  <h2>El pago aún no se confirma</h2>
+  <p><a class="btn" href="{% url 'pagar_extra' extra.id %}">Intentar de nuevo</a></p>
+{% endif %}
+<p><a class="btn sec" href="{% url 'panel_oferente' %}">Panel</a></p>
+{% endblock %}

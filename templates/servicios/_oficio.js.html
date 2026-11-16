@@ -1,0 +1,27 @@
+<script>
+(function () {
+  var mapa = {{ oficios_json|safe }};
+  var rubro = document.querySelector('[name="rubro"]');
+  var oficio = document.querySelector('[name="oficio"]');
+  if (!rubro || !oficio) return;
+  var elegido = oficio.value;
+  function pintar() {
+    var lista = mapa[rubro.value] || [];
+    oficio.innerHTML = "";
+    lista.forEach(function (par) {
+      var op = document.createElement("option");
+      op.value = par[0];
+      op.textContent = par[1];
+      if (par[0] === elegido) op.selected = true;
+      oficio.appendChild(op);
+    });
+  }
+  var sel = document.createElement("select");
+  sel.name = oficio.name;
+  sel.id = oficio.id;
+  oficio.parentNode.replaceChild(sel, oficio);
+  oficio = sel;
+  rubro.addEventListener("change", function () { elegido = ""; pintar(); });
+  pintar();
+})();
+</script>

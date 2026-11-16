@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Agenda{% endblock %}
+{% block content %}
+<h2>Agenda</h2>
+<p class="muted">Los clientes solo pueden elegir los huecos libres de estos días. Si cierras un día, no sale.</p>
+<form method="post">{% csrf_token %}
+  <table>
+    <thead><tr><th>Día</th><th>Atiende</th><th>Desde</th><th>Hasta</th></tr></thead>
+    <tbody>
+      {% for f in filas %}
+        <tr>
+          <td>{{ f.nombre }}</td>
+          <td><input type="checkbox" name="activo_{{ f.dia }}" value="1" {% if f.activo %}checked{% endif %}></td>
+          <td><input type="time" name="abre_{{ f.dia }}" value="{{ f.abre }}"></td>
+          <td><input type="time" name="cierra_{{ f.dia }}" value="{{ f.cierra }}"></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p><button class="btn" type="submit">Guardar horario semanal</button>
+  <a class="btn sec" href="{% url 'panel_oferente' %}">Volver</a></p>
+</form>
+
+<h3>Marcar o liberar espacios</h3>
+<p class="muted">Toca un hueco para bloquearlo o volverlo a abrir. Los ocupados por una cita pagada no se pueden quitar aquí.</p>
+{% for fecha, items in espacios %}
+  <section class="card">
+    <p class="kicker">{{ fecha|date:"l d/m" }}</p>
+    <div class="huecos">
+      {% for item in items %}
+        {% if item.estado == "libre" or item.estado == "bloqueado" %}
+          <form method="post" action="{% url 'toggle_espacio' %}" style="display:inline">{% csrf_token %}
+            <input type="hidden" name="inicio" value="{{ item.inicio|date:'c' }}">
+            <input type="hidden" name="fin" value="{{ item.fin|date:'c' }}">
+            <button class="btn {% if item.estado == 'bloqueado' %}{% else %}sec{% endif %}" type="submit">
+              {{ item.inicio|time:"h:i a" }} {% if item.estado == "bloqueado" %}(cerrado){% else %}(libre){% endif %}
+            </button>
+          </form>
+        {% else %}
+          <span class="pill">{{ item.inicio|time:"h:i a" }} {{ item.estado }}</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+{% empty %}
+  <p class="muted">Define el horario de arriba para ver los espacios del día.</p>
+{% endfor %}
+{% endblock %}

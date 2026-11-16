@@ -264,6 +264,18 @@ th { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; colo
 .rail .body { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 .rail h3 { margin: 0; font-size: 1rem; }
 
+.pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.ok-pill { background: var(--ok); color: var(--ok-ink); border-color: transparent; }
+.agenda { display: grid; gap: 12px; margin: 12px 0 28px; }
+.huecos { display: flex; flex-wrap: wrap; gap: 8px; }
+
 @media (max-width: 860px) {
   .hero, .layout, .pay-grid, .mayor-item { grid-template-columns: 1fr; }
   .header-row { align-items: flex-start; flex-direction: column; }

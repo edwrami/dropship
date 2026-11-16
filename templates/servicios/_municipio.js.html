@@ -1,0 +1,32 @@
+<script>
+(function () {
+  var mapa = {{ municipios_json|safe }};
+  var depto = document.querySelector('[name="departamento"]');
+  var ciudad = document.querySelector('[name="municipio"], [name="ciudad"]');
+  if (!depto || !ciudad) return;
+  var elegido = ciudad.value;
+  var sel = document.createElement("select");
+  sel.name = ciudad.name;
+  sel.id = ciudad.id;
+  sel.required = ciudad.required;
+  ciudad.parentNode.replaceChild(sel, ciudad);
+  ciudad = sel;
+  function pintar() {
+    var lista = mapa[depto.value] || [];
+    ciudad.innerHTML = "";
+    var vacio = document.createElement("option");
+    vacio.value = "";
+    vacio.textContent = "Municipio";
+    ciudad.appendChild(vacio);
+    lista.forEach(function (nombre) {
+      var op = document.createElement("option");
+      op.value = nombre;
+      op.textContent = nombre;
+      if (nombre === elegido) op.selected = true;
+      ciudad.appendChild(op);
+    });
+  }
+  depto.addEventListener("change", function () { elegido = ""; pintar(); });
+  pintar();
+})();
+</script>

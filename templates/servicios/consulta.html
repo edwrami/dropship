@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Cotización{% endblock %}
+{% block content %}
+<p class="eyebrow">Cotización</p>
+<h2>{{ consulta.oferente.nombre }}{% if consulta.especialidad %} · {{ consulta.especialidad.oficio_texto }}{% endif %}</h2>
+<p class="note">Hablen aquí. El teléfono, el WhatsApp y el correo del oferente salen cuando el cliente pague. Los números que se peguen en el chat se tapan.</p>
+
+<div class="hilo">
+  {% for m in mensajes %}
+    <article class="burbuja {% if es_oferente and m.autor == 'oferente' or es_cliente and m.autor == 'cliente' %}mia{% endif %}">
+      <p class="kicker">{{ m.get_autor_display|default:m.autor }} · {{ m.creado|date:"d/m H:i" }}</p>
+      <p>{{ m.texto|linebreaksbr }}</p>
+    </article>
+  {% endfor %}
+</div>
+
+{% if consulta.propuesta_cop %}
+  <p class="price">Tarifa propuesta ${{ consulta.propuesta_cop|floatformat:0|intcomma }} COP</p>
+  {% if es_cliente and consulta.estado != "aceptada" %}
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="clave" value="{{ clave }}">
+      <button class="btn" name="pagar" value="1" type="submit">Pagar esta tarifa</button>
+    </form>
+  {% endif %}
+{% endif %}
+
+{% if contacto_visible %}
+  <section class="card">
+    <p>Ya pagaste. Contacto: {{ consulta.oferente.telefono }} · WhatsApp {{ consulta.oferente.whatsapp }}</p>
+  </section>
+{% endif %}
+
+<form method="post">{% csrf_token %}
+  <input type="hidden" name="clave" value="{{ clave }}">
+  <label>Mensaje<textarea name="texto" required></textarea></label>
+  {% if es_oferente %}
+    <label>Proponer tarifa (COP)<input name="propuesta_cop" inputmode="numeric"></label>
+    <p><button class="btn sec" name="propuesta" value="1" type="submit">Enviar tarifa</button>
+    <button class="btn" type="submit">Enviar mensaje</button></p>
+  {% else %}
+    <p><button class="btn" type="submit">Enviar</button></p>
+  {% endif %}
+</form>
+<p><a class="btn sec" href="{% url 'detalle_oferente' consulta.oferente.slug %}">Volver a la ficha</a></p>
+{% endblock %}

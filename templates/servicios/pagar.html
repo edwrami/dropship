@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Pagar cita{% endblock %}
+{% block content %}
+<p class="eyebrow">Cita con {{ cita.oferente.nombre }}</p>
+<h2>{{ cita.inicio|date:"l d/m h:i a" }}</h2>
+<p class="price">${{ cita.monto_cop|floatformat:0|intcomma }} COP</p>
+<p>{{ cita.oferente.oficio_texto }} · {{ cita.duracion_minutos|default:cita.oferente.duracion_minutos }} min</p>
+<p>Referencia <strong>{{ cita.referencia_pago }}</strong>.</p>
+<p class="note">Mismo cobro de una venta. El contacto sale cuando Wompi confirma. El giro al oferente espera a que marques el trabajo como realizado.</p>
+{% include "servicios/_wompi.html" %}
+{% endblock %}

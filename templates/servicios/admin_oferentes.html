@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Oferentes · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Administración</p>
+<h1>Oferentes</h1>
+<p>
+  <a class="btn" href="{% url 'admin_oferente_nuevo' %}">Registrar oferente</a>
+  <a class="btn sec" href="{% url 'admin_catalogo_servicios' %}">Catálogo</a>
+  <a class="btn sec" href="{% url 'admin_consignaciones' %}">Consignar</a>
+</p>
+<form method="get">
+  <label>Buscar<input name="q" value="{{ q }}" placeholder="Nombre"></label>
+  <button class="btn" type="submit">Buscar</button>
+</form>
+{% if not oferentes %}
+  <p class="note">No hay oferentes.</p>
+{% else %}
+  <div class="catalog">
+    {% for o in oferentes %}
+      <article class="product">
+        <div class="body">
+          <p class="kicker">{{ o.get_estado_display }} · {{ o.ciudad }}</p>
+          <h3>{{ o.nombre }}</h3>
+          <p class="meta">{{ o.oficio_texto }} · Nequi {{ o.nequi }}</p>
+          <p class="meta">{{ o.email }} · {{ o.telefono }}</p>
+          <p>
+            <a class="btn" href="{% url 'admin_oferente_editar' o.id %}">Editar</a>
+          </p>
+          <form method="post" action="{% url 'admin_oferente_borrar' o.id %}" onsubmit="return confirm('¿Quitar a este oferente?');">
+            {% csrf_token %}
+            <button class="btn sec" type="submit">Borrar</button>
+          </form>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

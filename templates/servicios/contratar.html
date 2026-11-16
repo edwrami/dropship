@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Agendar con {{ oferente.nombre }}{% endblock %}
+{% block content %}
+<h2>Agendar {{ inicio|date:"l d/m h:i a" }}</h2>
+<p class="muted">{{ oferente.nombre }} · {% if especialidad %}{{ especialidad.oficio_texto }}{% endif %} · hasta {{ fin|date:"d/m h:i a" }}</p>
+{% if coberturas %}
+  <p class="muted">Zona: {% if cobertura %}{{ cobertura.municipio }}{% endif %}</p>
+{% endif %}
+<p class="note">Al pagar, la cita queda ocupada. El oferente recibe el dinero cuando marques el trabajo como realizado.</p>
+<form method="post">{% csrf_token %}
+  <input type="hidden" name="inicio" value="{{ inicio|date:'c' }}">
+  {% if especialidad %}<input type="hidden" name="especialidad" value="{{ especialidad.id }}">{% endif %}
+  {% if cobertura %}<input type="hidden" name="cobertura" value="{{ cobertura.id }}">{% endif %}
+  <input type="hidden" name="cantidad" value="{{ cantidad }}">
+  {% for field in form %}
+    {% if field.name != "inicio" %}
+      <p>{{ field.label_tag }} {{ field }} {{ field.errors }}</p>
+    {% endif %}
+  {% endfor %}
+  <button class="btn" type="submit">Continuar a pagar</button>
+  <a class="btn sec" href="{% url 'detalle_oferente' oferente.slug %}">Elegir otro hueco</a>
+</form>
+{% endblock %}

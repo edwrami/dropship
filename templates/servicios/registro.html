@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Ofrecer un servicio · ERA shop{% endblock %}
+{% block content %}
+<h2>Ofrecer un servicio</h2>
+<p class="muted">Para aparecer en el listado pagas ${{ cuota|floatformat:0|intcomma }} por Wompi, una sola vez. Cada cita se cobra en la página, igual que una venta. El cliente elige un hueco libre; cuando paga, la cita queda en tu agenda.</p>
+{% if otra_cuenta %}
+  <div class="note">Esta sesión ya tiene cuenta en ERA shop. El servicio queda amarrado a este correo.</div>
+{% endif %}
+<form method="post">{% csrf_token %}
+  {{ form.as_p }}
+  <p class="muted">El público ve nombre, oficio, ciudad, precio, fotos, calificación y agenda. El teléfono sale después del pago de la cita.</p>
+  <button class="btn" type="submit">Crear ficha y pagar la cuota</button>
+</form>
+<p class="muted">¿Ya te registraste? <a href="{% url 'entrar_oferente' %}">Entra</a>.</p>
+{% include "servicios/_oficio.js.html" %}
+{% include "servicios/_municipio.js.html" %}
+{% endblock %}

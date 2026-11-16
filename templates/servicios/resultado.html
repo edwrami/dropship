@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Cita{% endblock %}
+{% block content %}
+<h2>Cita {{ cita.inicio|date:"d/m/Y h:i a" }}</h2>
+<p>{{ cita.oferente.nombre }} · {{ cita.oferente.oficio_texto }}</p>
+{% if pagado %}
+  <div class="ok">Pago confirmado. La cita quedó en la agenda del oferente.</div>
+  {% if contacto_visible %}
+    <section class="card">
+      <p class="eyebrow">Contacto del oferente</p>
+      <p><strong>{{ cita.oferente.responsable }}</strong></p>
+      <p>Teléfono {{ cita.oferente.telefono }}</p>
+      <p>WhatsApp {{ cita.oferente.whatsapp }}</p>
+      {% if cita.oferente.email %}<p>{{ cita.oferente.email }}</p>{% endif %}
+      <p>{{ cita.oferente.ciudad }}, {{ cita.oferente.departamento }}</p>
+    </section>
+  {% endif %}
+  {% if cita.trabajo_realizado %}
+    <div class="ok">El cliente marcó el trabajo como realizado. El pago al oferente ya puede girarse.</div>
+  {% elif puede_cerrar %}
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="clave" value="{{ clave }}">
+      <input type="hidden" name="realizar" value="1">
+      <p>Cuando el oficio esté listo, márcalo. Recién ahí ERA shop le gira el restante al oferente.</p>
+      <button class="btn" type="submit">Marcar trabajo realizado</button>
+    </form>
+  {% elif pagado %}
+    <p class="note">El oferente espera a que el cliente marque el trabajo como realizado para recibir el giro.</p>
+  {% endif %}
+  {% if form %}
+    <h3>Califica este servicio</h3>
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="clave" value="{{ clave }}">
+      <input type="hidden" name="comentar" value="1">
+      {{ form.as_p }}
+      <button class="btn" type="submit">Enviar calificación</button>
+    </form>
+  {% endif %}
+{% else %}
+  <div class="note">El pago aún no está confirmado. El hueco se guarda un rato mientras pagas.</div>
+  <p><a class="btn" href="{% url 'pagar_cita' cita.id %}?clave={{ clave }}">Volver a pagar</a></p>
+{% endif %}
+<p><a class="btn sec" href="{% url 'detalle_oferente' cita.oferente.slug %}">Volver a la ficha</a></p>
+{% endblock %}

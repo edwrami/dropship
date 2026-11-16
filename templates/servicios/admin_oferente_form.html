@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{% if nuevo %}Registrar oferente{% else %}Editar oferente{% endif %} · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Administración</p>
+<h1>{% if nuevo %}Registrar oferente{% else %}Editar {{ oferente.nombre }}{% endif %}</h1>
+<p><a href="{% url 'admin_oferentes' %}">Volver a la lista</a></p>
+{% if nuevo %}
+  <p class="muted">Queda visible de una vez, sin cobrar los $100.000. Usa el Nequi al que vas a consignar cuando el cliente marque el trabajo hecho.</p>
+  <form method="post">{% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn" type="submit">Registrar oferente</button>
+  </form>
+  {% include "servicios/_oficio.js.html" %}
+  {% include "servicios/_municipio.js.html" %}
+{% else %}
+  <form method="post">
+    {% csrf_token %}
+    <label>Nombre<input name="nombre" value="{{ oferente.nombre }}" required></label>
+    <label>Responsable<input name="responsable" value="{{ oferente.responsable }}"></label>
+    <label>Documento<input name="documento" value="{{ oferente.documento }}"></label>
+    <label>Teléfono<input name="telefono" value="{{ oferente.telefono }}"></label>
+    <label>WhatsApp<input name="whatsapp" value="{{ oferente.whatsapp }}"></label>
+    <label>Nequi<input name="nequi" value="{{ oferente.nequi }}" required></label>
+    <label>Correo<input name="email" type="email" value="{{ oferente.email }}"></label>
+    <label>Departamento
+      <select name="departamento">
+        {% for d in departamentos %}
+          <option value="{{ d }}" {% if oferente.departamento == d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Ciudad<input name="ciudad" value="{{ oferente.ciudad }}"></label>
+    <label>Tipo
+      <select name="rubro">
+        {% for clave, nombre in rubros %}
+          <option value="{{ clave }}" {% if oferente.rubro == clave %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Oficio
+      <select name="oficio">
+        <option value="{{ oferente.oficio }}" selected>{{ oferente.oficio_texto }}</option>
+      </select>
+    </label>
+    <label>Descripción<textarea name="descripcion">{{ oferente.descripcion }}</textarea></label>
+    <label>Precio<input name="precio_cop" value="{{ oferente.precio_cop }}"></label>
+    <label>Estado
+      <select name="estado">
+        {% for clave, nombre in estados %}
+          <option value="{{ clave }}" {% if oferente.estado == clave %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="checks"><input type="checkbox" name="disponible_ahora" value="1" {% if oferente.disponible_ahora %}checked{% endif %}> Agenda abierta</label>
+    <p><button class="btn" type="submit">Guardar cambios</button></p>
+  </form>
+  {% include "servicios/_oficio.js.html" %}
+{% endif %}
+{% endblock %}

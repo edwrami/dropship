@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Consignar servicios · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Administración</p>
+<h1>Consignar al Nequi</h1>
+<p class="lede">Cuando el cliente marca el servicio como hecho, entra aquí el Nequi del oferente y lo que hay que consignarle.</p>
+<p><a href="{% url 'admin_servicios' %}">Volver</a></p>
+{% if not filas %}
+  <p class="note">Aún no hay trabajos marcados como realizados.</p>
+{% else %}
+  <div class="catalog">
+    {% for fila in filas %}
+      <article class="product">
+        <div class="body">
+          <p class="kicker">Cita #{{ fila.cita.id }} · {{ fila.cita.realizado_en|date:"d/m/Y H:i" }}</p>
+          <h3>{{ fila.cita.oferente.nombre }}</h3>
+          <p class="meta">{{ fila.cita.oferente.oficio_texto }} · {{ fila.cita.cliente_nombre }}</p>
+          <p class="price">Consignar ${{ fila.monto|floatformat:0|intcomma }}</p>
+          <p><strong>Nequi {{ fila.nequi }}</strong></p>
+          <p class="meta">Estado: {{ fila.estado }}{% if fila.giro and fila.giro.detalle %} · {{ fila.giro.detalle }}{% endif %}</p>
+          {% if not fila.consignado %}
+            <form method="post" action="{% url 'admin_marcar_consignado' fila.cita.id %}">
+              {% csrf_token %}
+              <label>Comprobante<input name="comprobante" placeholder="Número o nota del giro"></label>
+              <p><button class="btn" type="submit">Marcar consignado</button></p>
+            </form>
+          {% else %}
+            <p class="pill ok-pill">Ya consignado</p>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

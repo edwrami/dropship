@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "vendedores.apps.VendedoresConfig",
     "productos.apps.ProductosConfig",
     "pedidos",
+    "servicios.apps.ServiciosConfig",
 ]
 
 MIDDLEWARE = [
@@ -119,6 +120,7 @@ LOGIN_REDIRECT_URL = "panel_vendedor"
 # --- Config dropshipping ---
 MARGEN_DEFAULT = 40
 COMISION_PCT = 10
+CUOTA_SERVICIO_COP = 100000
 COMISION_MAYOR_PCT = 5
 WOMPI_PCT = "2.65"
 WOMPI_FIJO_COP = 700

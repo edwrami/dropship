@@ -17,12 +17,13 @@
   <meta property="og:type" content="website">
   {% endblock %}
 </head>
-<body>
+<body {% if oferente_actual %}data-alertas="{% url 'alertas_oferente' %}"{% endif %}>
   <header class="site-header">
     <div class="wrap header-row">
       <a class="brand" href="{% url 'lista_productos' %}">ERA <span>shop</span></a>
       <nav class="nav">
         <a href="{% url 'lista_productos' %}">Catálogo</a>
+        <a href="{% url 'lista_servicios' %}">Servicios</a>
         <a href="{% url 'proveedores_mayor' %}">Comprar al por mayor</a>
         <a href="{% url 'publicar_producto' %}">Publicar producto</a>
         <a href="{% url 'vender_mayor' %}">Vender al por mayor</a>
@@ -31,7 +32,12 @@
         {% endif %}
         {% if user.is_staff %}
           <a href="{% url 'lista_pedidos' %}">Ventas</a>
+          <a href="{% url 'admin_consignaciones' %}">Consignar servicios</a>
+          <a href="{% url 'admin_servicios' %}">Admin servicios</a>
           <a href="{% url 'reputacion' %}">Visitas</a>
+        {% endif %}
+        {% if oferente_actual %}
+          <a href="{% url 'panel_oferente' %}">Mi servicio</a>
         {% endif %}
         {% if vendedor_actual %}
           <a href="{% url 'panel_vendedor' %}">Mi tienda</a>
@@ -45,6 +51,8 @@
           <a href="{% url 'carrito_compra' %}">Carrito{% if carrito_unidades %} ({{ carrito_unidades }}){% endif %}</a>
           <a href="{% url 'historial_comprador' %}">Mis pedidos</a>
           <a href="{% url 'salir_vendedor' %}">Salir</a>
+        {% elif oferente_actual %}
+          <a href="{% url 'salir_oferente' %}">Salir</a>
         {% else %}
           <a href="{% url 'registro_comprador' %}">Registrarme</a>
         {% endif %}

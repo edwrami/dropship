@@ -11,6 +11,7 @@ def marketplace(request):
     vendedor = None
     cliente = None
     comprador = None
+    oferente = None
     user = getattr(request, "user", None)
     if user is not None and getattr(user, "is_authenticated", False):
         try:
@@ -25,6 +26,10 @@ def marketplace(request):
             comprador = user.comprador
         except ObjectDoesNotExist:
             comprador = None
+        try:
+            oferente = user.oferente
+        except ObjectDoesNotExist:
+            oferente = None
     cuenta = CuentaPlataforma.objects.filter(pk=1).first()
     detalle = cuenta.comision_detalle_pct if cuenta is not None else getattr(settings, "COMISION_PCT", 10)
     mayor = cuenta.comision_mayor_pct if cuenta is not None else getattr(settings, "COMISION_MAYOR_PCT", 5)
@@ -51,6 +56,7 @@ def marketplace(request):
         "cliente_actual": cliente,
         "cliente_completo": bool(cliente and cliente.registro_completo()),
         "comprador_actual": comprador,
+        "oferente_actual": oferente,
         "pedido_armado": pedido_armado,
         "carrito_unidades": carrito_unidades,
         "avisos_sin_leer": avisos_sin_leer,

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Catálogo de oficios · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Administración</p>
+<h1>Oficios y tipos de servicio</h1>
+<p class="lede">Lo que agregues aquí sale en el registro de oferentes y en el buscador. Puedes editar o borrar cualquiera.</p>
+<p>
+  <a href="{% url 'admin_servicios' %}">Volver</a>
+  · <a href="{% url 'admin_oferentes' %}">Oferentes</a>
+</p>
+
+<section class="hero-card">
+  <h2>Nuevo tipo</h2>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="tipo" value="rubro">
+    <label>Nombre<input name="nombre" required placeholder="Ej. Jardinería especializada"></label>
+    <p><button class="btn" type="submit">Agregar tipo</button></p>
+  </form>
+</section>
+
+<section class="hero-card">
+  <h2>Nuevo oficio</h2>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="tipo" value="oficio">
+    <label>Tipo
+      <select name="rubro_id" required>
+        {% for r in rubros %}
+          <option value="{{ r.id }}">{{ r.nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Nombre del oficio<input name="nombre" required placeholder="Ej. Plomería de urgencia"></label>
+    <p><button class="btn" type="submit">Agregar oficio</button></p>
+  </form>
+</section>
+
+{% for r in rubros %}
+  <article class="product">
+    <div class="body">
+      <form method="post" action="{% url 'admin_editar_rubro' r.id %}" class="filters-grid">
+        {% csrf_token %}
+        <label>Tipo<input name="nombre" value="{{ r.nombre }}"></label>
+        <label class="checks"><input type="checkbox" name="activo" value="1" {% if r.activo %}checked{% endif %}> Visible</label>
+        <p><button class="btn sec" type="submit">Guardar tipo</button></p>
+      </form>
+      <form method="post" action="{% url 'admin_borrar_rubro' r.id %}" onsubmit="return confirm('¿Borrar este tipo y todos sus oficios?');">
+        {% csrf_token %}
+        <button class="btn" type="submit">Borrar tipo</button>
+      </form>
+      <ul>
+        {% for o in r.oficios.all %}
+          <li>
+            <form method="post" action="{% url 'admin_editar_oficio' o.id %}" style="display:inline">
+              {% csrf_token %}
+              <input name="nombre" value="{{ o.nombre }}">
+              <label><input type="checkbox" name="activo" value="1" {% if o.activo %}checked{% endif %}> Visible</label>
+              <button class="btn sec" type="submit">Guardar</button>
+            </form>
+            <form method="post" action="{% url 'admin_borrar_oficio' o.id %}" style="display:inline" onsubmit="return confirm('¿Borrar este oficio?');">
+              {% csrf_token %}
+              <button type="submit">Borrar</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </article>
+{% endfor %}
+{% endblock %}

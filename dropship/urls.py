@@ -9,6 +9,7 @@ urlpatterns = [
     path("clientes/", include("vendedores.clientes_urls")),
     path("", include("productos.urls")),
     path("pedidos/", include("pedidos.urls")),
+    path("servicios/", include("servicios.urls")),
     re_path(
         r"^static/(?P<path>.*)$",
         serve,

@@ -163,7 +163,44 @@ function prepararRiel(riel) {
   riel.addEventListener("pointercancel", soltar);
 }
 
+function avisarCelular(titulo, texto) {
+  try {
+    if (navigator.vibrate) navigator.vibrate([400, 120, 400, 120, 600]);
+  } catch (e) {}
+  if (typeof Notification === "undefined") return;
+  if (Notification.permission === "granted") {
+    try { new Notification(titulo, { body: texto, tag: "era-servicio" }); } catch (e) {}
+  }
+}
+
+function escucharAlertas() {
+  const ruta = document.body && document.body.dataset.alertas;
+  if (!ruta) return;
+  if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    Notification.requestPermission().catch(function () {});
+  }
+  let visto = 0;
+  try { visto = Number(sessionStorage.getItem("eraAvisos") || 0); } catch (e) {}
+  function tick() {
+    fetch(ruta, { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        const n = Number(data.n || 0);
+        if (n > visto) {
+          const item = (data.items && data.items[0]) || {};
+          avisarCelular(item.t || "ERA shop", item.x || "Tienes un aviso de un servicio.");
+        }
+        visto = n;
+        try { sessionStorage.setItem("eraAvisos", String(visto)); } catch (e) {}
+      })
+      .catch(function () {});
+  }
+  tick();
+  setInterval(tick, 8000);
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+  escucharAlertas();
   document.querySelectorAll("[data-slider]").forEach(prepararSlider);
   document.querySelectorAll("[data-rail]").forEach(prepararRiel);
   document.querySelectorAll("[data-share]").forEach(prepararCompartir);

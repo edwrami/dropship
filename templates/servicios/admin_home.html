@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Admin servicios · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Administración</p>
+<h1>Servicios</h1>
+<p class="lede">Aquí agregas oficios, registras oferentes y ves qué hay que consignar al Nequi cuando el cliente marca el trabajo hecho.</p>
+<p>
+  <a class="btn" href="{% url 'admin_consignaciones' %}">Consignar a Nequi</a>
+  <a class="btn sec" href="{% url 'admin_catalogo_servicios' %}">Catálogo de oficios</a>
+  <a class="btn sec" href="{% url 'admin_oferentes' %}">Oferentes</a>
+  <a class="btn sec" href="{% url 'admin_oferente_nuevo' %}">Registrar oferente</a>
+</p>
+<section class="hero-card">
+  <p>Giros pendientes</p>
+  {% if pendientes %}
+    <ul>
+      {% for g in pendientes %}
+        <li>{{ g.cita.oferente.nombre }} · Nequi {{ g.destino_nequi }} · ${{ g.monto_cop|floatformat:0|intcomma }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">Nadie ha marcado un trabajo hecho todavía.</p>
+  {% endif %}
+</section>
+{% endblock %}

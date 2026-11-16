@@ -1,0 +1,22 @@
+<section class="card" style="max-width:520px">
+  <p class="eyebrow">Pago en la página</p>
+  <h3>Nequi, PSE o tarjeta</h3>
+  <p>El dinero entra por ERA shop, igual que una venta. No se gira al Nequi del oferente ni se pega un comprobante.</p>
+  {% if tarjeta_lista %}
+    <form>
+      <script
+        src="https://checkout.wompi.co/widget.js"
+        data-render="button"
+        data-public-key="{{ wompi.public_key }}"
+        data-currency="{{ wompi.currency }}"
+        data-amount-in-cents="{{ wompi.amount_in_cents }}"
+        data-reference="{{ wompi.reference }}"
+        data-signature:integrity="{{ wompi.signature }}"
+        data-redirect-url="{{ wompi.redirect_url }}"
+        {% if wompi.customer_email %}data-customer-data:email="{{ wompi.customer_email }}"{% endif %}
+      ></script>
+    </form>
+  {% else %}
+    <p>El cobro de la página todavía no está activo. ERA shop tiene que conectar la pasarela.</p>
+  {% endif %}
+</section>

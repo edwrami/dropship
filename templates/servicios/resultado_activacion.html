@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Cuota de oferente{% endblock %}
+{% block content %}
+{% if pagado %}
+  <h2>Ya apareces en servicios</h2>
+  <p>La cuota quedó pagada. Completa fotos y agenda para que la gente te reserve.</p>
+  <p><a class="btn" href="{% url 'panel_oferente' %}">Ir al panel</a>
+  <a class="btn sec" href="{% url 'detalle_oferente' oferente.slug %}">Ver tu página</a></p>
+{% else %}
+  <h2>La cuota aún no está confirmada</h2>
+  <p class="note">Si ya pagaste, espera un momento y recarga. Si no, vuelve a Wompi.</p>
+  <p><a class="btn" href="{% url 'activar_oferente' %}">Intentar de nuevo</a></p>
+{% endif %}
+{% endblock %}

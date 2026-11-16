@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ oferente.nombre }} · {{ oferente.oficio_texto }}{% endblock %}
+{% block content %}
+<article class="layout">
+  <div>
+    <div class="photo">
+      {% if oferente.fotos.all %}
+        <div class="slider">
+          <div class="slider-track">
+            {% for f in oferente.fotos.all %}
+              <img src="{{ f.url }}" alt="Trabajo {{ f.orden }}">
+            {% endfor %}
+          </div>
+        </div>
+      {% elif oferente.foto_url %}
+        <img src="{{ oferente.foto_url }}" alt="{{ oferente.nombre }}">
+      {% endif %}
+    </div>
+  </div>
+  <div>
+    <p class="kicker">{{ oferente.rubro_texto }}</p>
+    <h2>{{ oferente.nombre }}</h2>
+    <p class="meta">
+      {% for c in coberturas %}{{ c.municipio }}{% if not forloop.last %}, {% endif %}{% empty %}{{ oferente.ciudad }}{% endfor %}
+    </p>
+    <p class="meta">{{ oferente.visitas|intcomma }} visitas
+      {% if oferente.nota %} · {{ oferente.nota|floatformat:1 }} de 5 · {{ oferente.opiniones }} comentario{{ oferente.opiniones|pluralize }}{% endif %}
+    </p>
+    <p class="note">Pagas la cita por Wompi. El oferente recibe el restante <strong>cuando marques el trabajo como realizado</strong>.</p>
+    {% if oferente.descripcion %}{{ oferente.descripcion|linebreaks }}{% endif %}
+
+    <h3>Especialidades</h3>
+    <ul class="specs">
+      {% for e in especialidades %}
+        <li>
+          <a href="?oficio={{ e.id }}">{% if especialidad.id == e.id %}<strong>{% endif %}{{ e.oficio_texto }}{% if especialidad.id == e.id %}</strong>{% endif %}</a>
+          · ${{ e.precio_cop|floatformat:0|intcomma }} · {{ e.get_modo_tiempo_display }}
+        </li>
+      {% empty %}
+        <li>{{ oferente.oficio_texto }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</article>
+
+{% if especialidad %}
+  <section class="card">
+    <p class="eyebrow">Tarifas</p>
+    {% if especialidad.modo_cobro != "negociar" and especialidad.precio_cop %}
+      <p class="price">${{ especialidad.precio_cop|floatformat:0|intcomma }} COP · {{ especialidad.get_unidad_display }}</p>
+    {% endif %}
+    {% if especialidad.tarifa_detalle %}{{ especialidad.tarifa_detalle|linebreaks }}{% endif %}
+    {% if especialidad.modo_cobro != "tarifa" %}
+      <p class="muted">También se cotiza. Pregunta aquí: el teléfono no se muestra hasta que pagues.</p>
+    {% endif %}
+  </section>
+
+  <h3>Preguntar precio</h3>
+  <form method="post" action="{% url 'preguntar_precio' oferente.slug %}" class="card">{% csrf_token %}
+    <input type="hidden" name="especialidad" value="{{ especialidad.id }}">
+    <label>Tu nombre<input name="nombre" required></label>
+    <label>Teléfono (lo ve el oferente solo si pagas)<input name="telefono" required></label>
+    <label>Correo<input type="email" name="email"></label>
+    <label>Qué necesitas<textarea name="mensaje" required placeholder="Describe el trabajo. No pidas WhatsApp: se habla aquí."></textarea></label>
+    <p><button class="btn" type="submit">Enviar cotización</button></p>
+  </form>
+
+  {% if especialidad.modo_cobro != "negociar" %}
+  <h3>Agenda de {{ especialidad.oficio_texto }}</h3>
+  {% if especialidad.modo_tiempo == "cita" %}
+    {% if not agenda %}
+      <p class="note">No hay huecos libres en los próximos días.</p>
+    {% else %}
+      <div class="agenda">
+        {% for fecha, huecos in agenda %}
+          <section class="card">
+            <p class="kicker">{{ fecha|date:"l d/m" }}</p>
+            <div class="huecos">
+              {% for h in huecos %}
+                <a class="btn sec" href="{% url 'contratar_oferente' oferente.slug %}?inicio={{ h|date:'c' }}&oficio={{ especialidad.id }}">{{ h|time:"h:i a" }}</a>
+              {% endfor %}
+            </div>
+          </section>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="muted">Este trabajo se reserva por {{ especialidad.get_modo_tiempo_display|lower }}. Elige el día de inicio.</p>
+    <form method="get" action="{% url 'contratar_oferente' oferente.slug %}">
+      <input type="hidden" name="oficio" value="{{ especialidad.id }}">
+      <label>Empieza
+        <select name="inicio">
+          {% for d in dias_largos %}
+            <option value="{{ d|date:'Y-m-d' }}T08:00:00">{{ d|date:"l d/m/Y" }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>{% if especialidad.modo_tiempo == "semana" %}Semanas{% else %}Días{% endif %}
+        <select name="cantidad">
+          {% for n in "123456"|make_list %}
+            <option value="{{ n }}">{{ n }}</option>
+          {% endfor %}
+          <option value="8">8</option>
+          <option value="10">10</option>
+          <option value="12">12</option>
+        </select>
+      </label>
+      <p><button class="btn" type="submit">Continuar</button></p>
+    </form>
+    {% if not dias_largos %}<p class="note">No hay días libres para un trabajo de esa duración.</p>{% endif %}
+  {% endif %}
+  {% endif %}
+{% endif %}
+
+{% if oferente.comentarios.all %}
+  <h3>Calificaciones</h3>
+  {% for c in oferente.comentarios.all %}
+    <article class="burbuja">
+      <p><strong>{{ c.nombre }}</strong> · {{ c.estrellas }} de 5</p>
+      {% if c.texto %}<p>{{ c.texto }}</p>{% endif %}
+    </article>
+  {% endfor %}
+{% endif %}
+{% endblock %}

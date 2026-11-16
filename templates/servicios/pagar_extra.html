@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Pagar ampliación{% endblock %}
+{% block content %}
+<h2>${{ cuota|floatformat:0|intcomma }} COP</h2>
+<p>{% if extra.tipo == "ciudad" %}Para aparecer en {{ extra.cobertura.municipio }}.{% else %}Para el oficio {{ extra.especialidad.oficio_texto }}.{% endif %}</p>
+<p>Referencia <strong>{{ cobro.referencia_pago }}</strong>.</p>
+{% include "servicios/_wompi.html" %}
+<p><a class="btn sec" href="{% url 'panel_oferente' %}">Volver</a></p>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Ficha del servicio{% endblock %}
+{% block content %}
+<h2>Ficha</h2>
+<form method="post">{% csrf_token %}
+  {{ form.as_p }}
+  <button class="btn" type="submit">Guardar</button>
+  <a class="btn sec" href="{% url 'panel_oferente' %}">Volver</a>
+</form>
+{% include "servicios/_oficio.js.html" %}
+{% endblock %}

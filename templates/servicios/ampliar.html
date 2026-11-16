@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Ampliar cobertura{% endblock %}
+{% block content %}
+<h2>Otra ciudad u otro oficio</h2>
+<p>La cuota inicial cubre <strong>un oficio en un municipio</strong>. Cada ciudad extra y cada oficio extra vale ${{ cuota|floatformat:0|intcomma }} por Wompi.</p>
+
+<section class="card">
+  <h3>Aparecer en otro municipio</h3>
+  <form method="post">{% csrf_token %}
+    <input type="hidden" name="tipo" value="ciudad">
+    <label>Departamento
+      <select name="departamento" required>
+        <option value="">Selecciona</option>
+        {% for d in departamentos %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Municipio
+      <select name="municipio" required></select>
+    </label>
+    <p><button class="btn" type="submit">Pagar ${{ cuota|floatformat:0|intcomma }}</button></p>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Agregar otro oficio</h3>
+  <form method="post">{% csrf_token %}
+    <input type="hidden" name="tipo" value="servicio">
+    <label>Tipo<select name="rubro">{% for clave, nombre in rubros %}<option value="{{ clave }}">{{ nombre }}</option>{% endfor %}</select></label>
+    <label>Oficio<input name="oficio" required></label>
+    <label>Cómo cobras
+      <select name="modo_cobro">
+        <option value="ambos">Tarifa publicada y se puede negociar</option>
+        <option value="tarifa">Solo tarifa fija</option>
+        <option value="negociar">Solo cotizo (se negocia)</option>
+      </select>
+    </label>
+    <label>Precio de referencia (COP)<input name="precio_cop" inputmode="numeric" placeholder="0 si solo cotizas"></label>
+    <label>Lista de tarifas<textarea name="tarifa_detalle" placeholder="Consulta $80.000 · Domicilio $120.000 · Noche $200.000"></textarea></label>
+    <label>Cómo se agenda
+      <select name="modo_tiempo">
+        {% for clave, nombre in modos %}<option value="{{ clave }}">{{ nombre }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Minutos por cita (si aplica)
+      <select name="duracion_minutos">
+        <option value="30">30</option>
+        <option value="60" selected>60</option>
+        <option value="90">90</option>
+        <option value="120">120</option>
+      </select>
+    </label>
+    <p><button class="btn" type="submit">Pagar ${{ cuota|floatformat:0|intcomma }}</button></p>
+  </form>
+</section>
+<p><a class="btn sec" href="{% url 'panel_oferente' %}">Volver</a></p>
+{% include "servicios/_oficio.js.html" %}
+{% include "servicios/_municipio.js.html" %}
+{% endblock %}
