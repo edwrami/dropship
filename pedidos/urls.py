@@ -1,9 +1,11 @@
 ﻿from django.urls import path
 
-from . import reputacion, views
+from . import reputacion, tesoreria, views
 
 urlpatterns = [
     path("", views.lista_pedidos, name="lista_pedidos"),
+    path("tesoreria/", tesoreria.panel, name="tesoreria"),
+    path("tesoreria/accion/", tesoreria.post_tesoreria, name="tesoreria_accion"),
     path("avisos/", views.avisos, name="avisos"),
     path("reputacion/", reputacion.reputacion, name="reputacion"),
     path("crear/<int:producto_id>/", views.crear_pedido, name="crear_pedido"),

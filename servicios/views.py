@@ -43,15 +43,20 @@ from .models import (
     Oferente,
     PagoActivacion,
     PagoExtra,
+    PagoMensualidad,
 )
 from .municipios import MUNICIPIOS
 from .catalogo import oficios_mapa, rubros_choices
 from .oficios import DIAS, MODOS_TIEMPO
 from .pagos import (
+    abrir_cobro_inscripcion,
+    abrir_cobro_mensual,
     aplicar_comision_cita,
     aplicar_transaccion,
     cuota_activacion,
-    liberar_giro_si_realizado,
+    cuota_mensualidad,
+    cuota_primera,
+    intentar_giro_servicio,
     nueva_referencia,
 )
 
@@ -67,8 +72,9 @@ def _oferente(user):
 
 def _publico():
     return (
-        Oferente.objects.filter(estado="activo")
+        Oferente.objects.filter(estado="activo", mensualidad_hasta__gte=timezone.now())
         .annotate(nota=Avg("comentarios__estrellas"), opiniones=Count("comentarios", distinct=True))
+        .prefetch_related("fotos")
     )
 
 
@@ -102,7 +108,8 @@ def lista(request):
         qs = qs.filter(nota__gte=4)
     if request.GET.get("satisfechos"):
         qs = qs.filter(opiniones__gte=1, nota__gte=4)
-    qs = qs.distinct()
+    if q or rubro or oficio or ciudad or departamento:
+        qs = qs.distinct()
     return render(request, "servicios/lista.html", {
         "oferentes": qs[:120],
         "total": qs.count(),
@@ -111,12 +118,20 @@ def lista(request):
         "municipios_json": json.dumps(MUNICIPIOS),
         "departamentos": DEPARTAMENTOS,
         "cuota": cuota_activacion(),
+        "mensualidad": cuota_mensualidad(),
+        "primera": cuota_primera(),
     })
 
 
 def detalle(request, slug):
     oferente = get_object_or_404(
-        _publico().prefetch_related("fotos", "horarios", "comentarios", "coberturas", "especialidades"),
+        _publico().prefetch_related(
+            "fotos",
+            "horarios",
+            "coberturas",
+            "especialidades",
+            "comentarios",
+        ),
         slug=slug,
     )
     Oferente.objects.filter(pk=oferente.pk).update(visitas=oferente.visitas + 1)
@@ -151,90 +166,88 @@ def registro(request):
     form = RegistroOferenteForm(request.POST or None, usuario=request.user)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
-        with transaction.atomic():
-            if request.user.is_authenticated:
-                user = request.user
-            else:
-                user = User.objects.create_user(
-                    username=data["email"],
-                    email=data["email"],
-                    password=data["password"],
-                )
+        from vendedores.cuentas import abrir_cuenta, asegurar_comprador
+        user, error = abrir_cuenta(
+            request, data["email"], data.get("password") or "", data.get("password2") or "",
+        )
+        if error:
+            form.add_error("password", error)
+        elif _oferente(user):
+            login(request, user)
+            messages.info(request, "Este correo ya tiene ficha de oferente.")
+            return redirect("panel_oferente")
+        else:
+            with transaction.atomic():
                 login(request, user)
-            oferente = Oferente.objects.create(
-                user=user,
-                nombre=data["nombre"],
-                responsable=data["responsable"],
-                documento=data["documento"],
-                telefono=data["telefono"],
-                whatsapp=data["whatsapp"],
-                nequi=data["nequi"],
-                email=data["email"],
-                ciudad=data["ciudad"].strip(),
-                departamento=data["departamento"],
-                rubro=data["rubro"],
-                oficio=data["oficio"],
-                descripcion=data["descripcion"],
-                precio_cop=data["precio_cop"],
-                unidad=data["unidad"],
-                duracion_minutos=int(data["duracion_minutos"]),
-                acepta_terminos=True,
-                estado="pendiente_pago",
-            )
-            for dia in range(6):
-                Horario.objects.create(
-                    oferente=oferente, dia=dia,
-                    abre=time(8, 0), cierra=time(18, 0), activo=True,
+                asegurar_comprador(user, {**data, "nombre": data["responsable"]})
+                oferente = Oferente.objects.create(
+                    user=user,
+                    nombre=data["nombre"],
+                    responsable=data["responsable"],
+                    documento=data["documento"],
+                    telefono=data["telefono"],
+                    whatsapp=data["whatsapp"],
+                    nequi=data["nequi"],
+                    email=data["email"],
+                    ciudad=data["ciudad"].strip(),
+                    departamento=data["departamento"],
+                    rubro=data["rubro"],
+                    oficio=data["oficio"],
+                    descripcion=data["descripcion"],
+                    precio_cop=data["precio_cop"],
+                    unidad=data["unidad"],
+                    duracion_minutos=int(data["duracion_minutos"]),
+                    acepta_terminos=True,
+                    estado="pendiente_pago",
                 )
-            Horario.objects.create(
-                oferente=oferente, dia=6,
-                abre=time(8, 0), cierra=time(12, 0), activo=False,
+                for dia in range(6):
+                    Horario.objects.create(
+                        oferente=oferente, dia=dia,
+                        abre=time(8, 0), cierra=time(18, 0), activo=True,
+                    )
+                Horario.objects.create(
+                    oferente=oferente, dia=6,
+                    abre=time(8, 0), cierra=time(12, 0), activo=False,
+                )
+                Cobertura.objects.get_or_create(
+                    oferente=oferente,
+                    departamento=oferente.departamento,
+                    municipio=oferente.ciudad,
+                    defaults={"incluida": True, "activa": False},
+                )
+                Especialidad.objects.get_or_create(
+                    oferente=oferente,
+                    rubro=oferente.rubro,
+                    oficio=oferente.oficio,
+                    defaults={
+                        "precio_cop": oferente.precio_cop,
+                        "unidad": oferente.unidad,
+                        "modo_tiempo": data.get("modo_tiempo") or "cita",
+                        "duracion_minutos": oferente.duracion_minutos,
+                        "incluida": True,
+                        "activa": False,
+                    },
+                )
+            messages.success(
+                request,
+                "Ficha creada. Paga $100.000 de inscripción; ese cobro incluye el primer mes. "
+                "Después ERA shop te abre solo el cobro de $50.000 cada mes. Las citas pagan comisión aparte.",
             )
-            Cobertura.objects.get_or_create(
-                oferente=oferente,
-                departamento=oferente.departamento,
-                municipio=oferente.ciudad,
-                defaults={"incluida": True, "activa": False},
-            )
-            Especialidad.objects.get_or_create(
-                oferente=oferente,
-                rubro=oferente.rubro,
-                oficio=oferente.oficio,
-                defaults={
-                    "precio_cop": oferente.precio_cop,
-                    "unidad": oferente.unidad,
-                    "modo_tiempo": data.get("modo_tiempo") or "cita",
-                    "duracion_minutos": oferente.duracion_minutos,
-                    "incluida": True,
-                    "activa": False,
-                },
-            )
-        messages.success(request, "Cuenta lista. Paga $100.000 por Wompi para aparecer en servicios.")
-        return redirect("activar_oferente")
+            return redirect("activar_oferente")
     return render(request, "servicios/registro.html", {
         "form": form,
         "oficios_json": json.dumps(oficios_mapa()),
         "municipios_json": json.dumps(MUNICIPIOS),
         "cuota": cuota_activacion(),
+        "mensualidad": cuota_mensualidad(),
+        "primera": cuota_primera(),
         "otra_cuenta": request.user.is_authenticated,
     })
 
 
 def entrar(request):
-    if _oferente(request.user):
-        return redirect("panel_oferente")
-    error = ""
-    if request.method == "POST":
-        email = (request.POST.get("email") or "").strip().lower()
-        user = authenticate(request, username=email, password=request.POST.get("password") or "")
-        if user is None:
-            error = "Correo o contraseña incorrectos."
-        else:
-            login(request, user)
-            if _oferente(user) is None:
-                return redirect("registro_oferente")
-            return redirect("panel_oferente")
-    return render(request, "servicios/entrar.html", {"error": error})
+    from vendedores import cuentas
+    return cuentas.entrar_cuenta(request)
 
 
 def salir(request):
@@ -242,11 +255,12 @@ def salir(request):
     return redirect("lista_servicios")
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def panel(request):
     oferente = _oferente(request.user)
     if oferente is None:
         return redirect("registro_oferente")
+    abrir_cobro_mensual(oferente)
     citas = oferente.citas.select_related("pago", "giro", "especialidad").all()[:80]
     return render(request, "servicios/panel.html", {
         "oferente": oferente,
@@ -257,11 +271,14 @@ def panel(request):
         "especialidades": oferente.especialidades.all(),
         "consultas": oferente.consultas.select_related("especialidad")[:30],
         "cuota": cuota_activacion(),
+        "mensualidad": cuota_mensualidad(),
+        "primera": cuota_primera(),
+        "aparece": oferente.visible,
         "dias": DIAS,
     })
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def ficha(request):
     oferente = _oferente(request.user)
     if oferente is None:
@@ -298,7 +315,7 @@ def ficha(request):
     })
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def horarios(request):
     oferente = _oferente(request.user)
     if oferente is None:
@@ -341,7 +358,7 @@ def horarios(request):
     })
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def fotos(request):
     oferente = _oferente(request.user)
     if oferente is None:
@@ -378,27 +395,21 @@ def fotos(request):
     return render(request, "servicios/fotos.html", {"oferente": oferente, "fotos": actuales})
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def activar(request):
     oferente = _oferente(request.user)
     if oferente is None:
         return redirect("registro_oferente")
-    if oferente.estado == "activo":
-        messages.success(request, "Ya apareces en servicios.")
+    if oferente.inscripcion_pagada:
+        if not oferente.mensualidad_al_dia:
+            return redirect("mensualidad_oferente")
+        messages.success(request, "La inscripción ya está paga.")
         return redirect("panel_oferente")
-    cobro, _creado = PagoActivacion.objects.get_or_create(
-        oferente=oferente,
-        defaults={
-            "monto_cop": cuota_activacion(),
-            "referencia_pago": nueva_referencia("ACT", oferente.id),
-        },
-    )
+    cobro = abrir_cobro_inscripcion(oferente)
     if cobro.estado_pago == "aprobado":
-        oferente.estado = "activo"
-        oferente.save(update_fields=["estado"])
-        return redirect("panel_oferente")
+        return redirect("mensualidad_oferente")
     if cobro.estado_pago in ("declinado", "error") or not cobro.referencia_pago:
-        cobro.monto_cop = cuota_activacion()
+        cobro.monto_cop = cuota_primera()
         cobro.referencia_pago = nueva_referencia("ACT", oferente.id)
         cobro.estado_pago = "pendiente"
         cobro.save()
@@ -406,7 +417,9 @@ def activar(request):
         "oferente": oferente,
         "cobro": cobro,
         "tarjeta_lista": wompi.checkout_listo(),
-        "cuota": cuota_activacion(),
+        "cuota": cuota_primera(),
+        "mensualidad": cuota_mensualidad(),
+        "inscripcion": cuota_activacion(),
     }
     if ctx["tarjeta_lista"]:
         destino = request.build_absolute_uri(reverse("resultado_activacion"))
@@ -414,7 +427,7 @@ def activar(request):
     return render(request, "servicios/activar.html", ctx)
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def resultado_activacion(request):
     oferente = _oferente(request.user)
     if oferente is None:
@@ -429,15 +442,73 @@ def resultado_activacion(request):
                 aplicar_transaccion(tx)
                 cobro.refresh_from_db()
                 oferente.refresh_from_db()
+    inscrito = cobro and cobro.estado_pago == "aprobado"
     return render(request, "servicios/resultado_activacion.html", {
         "oferente": oferente,
         "cobro": cobro,
-        "pagado": oferente.estado == "activo",
+        "pagado": inscrito,
+        "falta_mensualidad": inscrito and not oferente.mensualidad_al_dia,
+        "mensualidad": cuota_mensualidad(),
+    })
+
+
+@login_required(login_url="entrar_cuenta")
+def mensualidad(request):
+    oferente = _oferente(request.user)
+    if oferente is None:
+        return redirect("registro_oferente")
+    if not oferente.inscripcion_pagada:
+        messages.info(request, "Primero paga la inscripción y el primer mes.")
+        return redirect("activar_oferente")
+    cobro = abrir_cobro_mensual(oferente)
+    if cobro is None:
+        cobro = PagoMensualidad.objects.create(
+            oferente=oferente,
+            monto_cop=cuota_mensualidad(),
+            referencia_pago=nueva_referencia("MEN", oferente.id),
+        )
+    ctx = {
+        "oferente": oferente,
+        "cobro": cobro,
+        "tarjeta_lista": wompi.checkout_listo(),
+        "cuota": cuota_mensualidad(),
+    }
+    if ctx["tarjeta_lista"]:
+        destino = request.build_absolute_uri(reverse("resultado_mensualidad"))
+        ctx["wompi"] = wompi.contexto_widget(cobro, destino)
+    return render(request, "servicios/mensualidad.html", ctx)
+
+
+@login_required(login_url="entrar_cuenta")
+def resultado_mensualidad(request):
+    oferente = _oferente(request.user)
+    if oferente is None:
+        return redirect("registro_oferente")
+    cobro = oferente.pagos_mensuales.order_by("-id").first()
+    tx_id = (request.GET.get("id") or "").strip()[:80]
+    if cobro and tx_id:
+        publica = wompi.claves_wompi()[0]
+        tx = wompi.consultar_transaccion(tx_id, publica)
+        if tx and (tx.get("reference") or "") == cobro.referencia_pago:
+            if int(tx.get("amount_in_cents") or 0) == wompi.monto_centavos(cobro):
+                aplicar_transaccion(tx)
+                cobro.refresh_from_db()
+                oferente.refresh_from_db()
+    return render(request, "servicios/resultado_mensualidad.html", {
+        "oferente": oferente,
+        "cobro": cobro,
+        "pagado": oferente.visible,
+        "mensualidad": cuota_mensualidad(),
     })
 
 
 def contratar(request, slug):
     oferente = get_object_or_404(_publico(), slug=slug)
+    if not request.user.is_authenticated:
+        return redirect(f"/entrar/?next={request.get_full_path()}")
+    if oferente.user_id == request.user.id:
+        messages.error(request, "No puedes contratarte a ti mismo.")
+        return redirect("detalle_oferente", slug=slug)
     if not oferente.disponible_ahora:
         messages.error(request, "Este oferente no está recibiendo citas ahora.")
         return redirect("detalle_oferente", slug=slug)
@@ -469,14 +540,22 @@ def contratar(request, slug):
         messages.error(request, "Ese espacio ya no está libre. Elige otro.")
         return redirect("detalle_oferente", slug=slug)
     inicial = {"inicio": inicio.isoformat()}
-    if request.user.is_authenticated:
-        inicial["nombre"] = request.user.get_full_name() or request.user.username
-        inicial["email"] = request.user.email
+    inicial["nombre"] = request.user.get_full_name() or request.user.username
+    inicial["email"] = request.user.email or ""
+    try:
+        inicial["nombre"] = request.user.comprador.nombre
+        inicial["telefono"] = request.user.comprador.telefono
+        inicial["email"] = request.user.email or inicial["email"]
+    except ObjectDoesNotExist:
         try:
-            inicial["nombre"] = request.user.comprador.nombre
-            inicial["telefono"] = request.user.comprador.telefono
+            tienda = request.user.vendedor
+            inicial["nombre"] = tienda.responsable
+            inicial["telefono"] = tienda.telefono
         except ObjectDoesNotExist:
-            pass
+            ofe = _oferente(request.user)
+            if ofe:
+                inicial["nombre"] = ofe.responsable
+                inicial["telefono"] = ofe.telefono
     form = ContratarForm(request.POST or None, initial=inicial)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
@@ -529,7 +608,7 @@ def contratar(request, slug):
 
 
 def _cita_clave(request, cita_id):
-    cita = get_object_or_404(Cita.objects.select_related("oferente"), pk=cita_id)
+    cita = get_object_or_404(Cita.objects.select_related("oferente", "especialidad", "comentario"), pk=cita_id)
     clave = (request.GET.get("clave") or request.POST.get("clave") or "").strip()
     dueno = request.user.is_authenticated and (
         cita.cliente_id == request.user.id or _oferente(request.user) == cita.oferente or request.user.is_staff
@@ -575,32 +654,56 @@ def resultado_cita(request, cita_id):
                 cita.refresh_from_db()
     contacto = cita.estado_pago == "aprobado"
     form = None
-    ya_comento = Comentario.objects.filter(cita=cita).exists()
-    if contacto and request.method == "POST" and request.POST.get("comentar"):
-        form = ComentarioForm(request.POST)
-        if form.is_valid() and not ya_comento:
-            Comentario.objects.create(
-                cita=cita,
-                oferente=cita.oferente,
-                estrellas=int(form.cleaned_data["estrellas"]),
-                texto=form.cleaned_data.get("texto") or "",
-                nombre=cita.cliente_nombre,
-            )
-            messages.success(request, "Gracias por la calificación.")
+    try:
+        ya_comento = cita.comentario is not None
+    except ObjectDoesNotExist:
+        ya_comento = False
+    es_oferente = request.user.is_authenticated and _oferente(request.user) == cita.oferente
+    es_cliente = (not request.user.is_authenticated) or cita.cliente_id == request.user.id or clave == cita.clave_contacto
+    if contacto and request.method == "POST" and es_cliente and not es_oferente:
+        quiere_cerrar = bool(request.POST.get("realizar") or request.POST.get("cerrar"))
+        quiere_comentar = bool(request.POST.get("comentar") or request.POST.get("cerrar"))
+        if quiere_comentar and not ya_comento:
+            form = ComentarioForm(request.POST)
+            if form.is_valid():
+                Comentario.objects.create(
+                    cita=cita,
+                    oferente=cita.oferente,
+                    estrellas=int(form.cleaned_data["estrellas"]),
+                    texto=form.cleaned_data.get("texto") or "",
+                    nombre=cita.cliente_nombre,
+                )
+                ya_comento = True
+            elif quiere_cerrar:
+                messages.error(request, "Califica el servicio para que ERA shop gire el pago al Nequi del oferente.")
+                return render(request, "servicios/resultado.html", {
+                    "cita": cita,
+                    "pagado": contacto,
+                    "contacto_visible": contacto,
+                    "form": form,
+                    "clave": cita.clave_contacto,
+                    "puede_cerrar": not cita.trabajo_realizado,
+                    "ya_comento": False,
+                })
+        if quiere_cerrar and not cita.trabajo_realizado:
+            if not ya_comento:
+                messages.error(request, "Primero califica el trabajo. El giro sale cuando hay calificación y visto bueno.")
+            else:
+                cita.trabajo_realizado = True
+                cita.realizado_en = timezone.now()
+                cita.save(update_fields=["trabajo_realizado", "realizado_en"])
+        if ya_comento and cita.trabajo_realizado:
+            giro = intentar_giro_servicio(cita)
+            if giro:
+                messages.success(request, "Quedó realizado y calificado. El dinero sigue en Wompi hasta que ERA shop autorice el giro.")
+            else:
+                messages.success(request, "Gracias. El trabajo y la calificación quedaron registrados.")
             return redirect(f"{reverse('resultado_cita', args=[cita.id])}?clave={cita.clave_contacto}")
-    if contacto and request.method == "POST" and request.POST.get("realizar"):
-        es_cliente = (not request.user.is_authenticated) or cita.cliente_id == request.user.id or clave == cita.clave_contacto
-        es_oferente = request.user.is_authenticated and _oferente(request.user) == cita.oferente
-        if es_cliente and not es_oferente and not cita.trabajo_realizado:
-            cita.trabajo_realizado = True
-            cita.realizado_en = timezone.now()
-            cita.save(update_fields=["trabajo_realizado", "realizado_en"])
-            liberar_giro_si_realizado(cita)
-            messages.success(request, "Marcaste el trabajo como realizado. Ya se puede girar el pago al oferente.")
+        if ya_comento and not quiere_cerrar:
+            messages.success(request, "Gracias por la calificación. Cuando marques el trabajo como realizado, sale el giro.")
             return redirect(f"{reverse('resultado_cita', args=[cita.id])}?clave={cita.clave_contacto}")
     if contacto and not ya_comento:
         form = form or ComentarioForm()
-    es_oferente = request.user.is_authenticated and _oferente(request.user) == cita.oferente
     return render(request, "servicios/resultado.html", {
         "cita": cita,
         "pagado": contacto,
@@ -608,10 +711,11 @@ def resultado_cita(request, cita_id):
         "form": form,
         "clave": cita.clave_contacto,
         "puede_cerrar": contacto and not cita.trabajo_realizado and not es_oferente,
+        "ya_comento": ya_comento,
     })
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def toggle_espacio(request):
     oferente = _oferente(request.user)
     if oferente is None:
@@ -641,7 +745,7 @@ def toggle_espacio(request):
     return redirect("horarios_oferente")
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def ampliar(request):
     oferente = _oferente(request.user)
     if oferente is None:
@@ -731,7 +835,7 @@ def ampliar(request):
     })
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def pagar_extra(request, extra_id):
     oferente = _oferente(request.user)
     extra = get_object_or_404(PagoExtra, pk=extra_id, oferente=oferente)
@@ -755,7 +859,7 @@ def pagar_extra(request, extra_id):
     return render(request, "servicios/pagar_extra.html", ctx)
 
 
-@login_required(login_url="entrar_oferente")
+@login_required(login_url="entrar_cuenta")
 def resultado_extra(request, extra_id):
     oferente = _oferente(request.user)
     extra = get_object_or_404(PagoExtra, pk=extra_id, oferente=oferente)

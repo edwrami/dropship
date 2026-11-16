@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Entrar · ERA shop{% endblock %}
+{% block content %}
+<h2>Entrar</h2>
+<p class="muted">Un correo, una contraseña. Sirve para comprar, vender al detal, vender al por mayor y ofrecer servicios.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<form method="post" style="max-width:420px">{% csrf_token %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  <label>Correo<input type="email" name="email" required></label>
+  <label>Contraseña<input type="password" name="password" required></label>
+  <p><button class="btn" type="submit">Entrar</button></p>
+</form>
+<p class="muted">¿Aún no tienes cuenta? <a href="{% url 'registro_cuenta' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Registrarme</a></p>
+<p class="muted"><a href="{% url 'recuperar_clave' %}">Olvidé la clave</a></p>
+{% endblock %}

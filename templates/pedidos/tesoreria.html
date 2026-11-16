@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Dinero en Wompi · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Tesorería</p>
+<h1>El dinero se queda en Wompi</h1>
+<p class="lede">El cliente paga a tu cuenta Wompi. Nadie recibe Nequi hasta que tú lo autorices: tu Nequi (comisiones e inscripciones) o el Nequi del vendedor/oferente (el restante).</p>
+<p><a class="btn sec" href="{% url 'lista_pedidos' %}">Ventas</a> <a class="btn sec" href="{% url 'admin_consignaciones' %}">Oficios</a> <a class="btn sec" href="{% url 'mi_panel' %}">Mi panel</a></p>
+
+<div class="pay-grid">
+  <section class="card">
+    <p>De ERA shop en Wompi</p>
+    <strong>${{ saldo_era|floatformat:0|intcomma }}</strong>
+    <p>Inscripciones, mensualidades, oficios extra y comisiones. La tarifa de Wompi no entra aquí.</p>
+  </section>
+  <section class="card">
+    <p>Tu Nequi</p>
+    <strong>{{ nequi_era|default:"Sin Nequi" }}</strong>
+    <p>{% if payouts_listos %}Pagos a terceros conectado.{% else %}Falta conectar Pagos a terceros en Ventas para girar desde Wompi.{% endif %}</p>
+  </section>
+</div>
+
+<section class="card" style="max-width:520px">
+  <h3>Autorizar transferencia a tu Nequi</h3>
+  <p>Saca de Wompi lo de ERA shop. El restante de vendedores y oferentes no se mueve con este botón.</p>
+  <form method="post" action="{% url 'tesoreria_accion' %}">{% csrf_token %}
+    <input type="hidden" name="accion" value="retirar_nequi">
+    <input type="hidden" name="next" value="{% url 'tesoreria' %}">
+    <label>Monto COP<input name="monto" value="{{ saldo_era|floatformat:0 }}" required></label>
+    <p><button class="btn" type="submit" {% if not nequi_era or saldo_era <= 0 %}disabled{% endif %}>Enviar a mi Nequi</button></p>
+  </form>
+  {% if not nequi_era %}
+    <p class="note">Guarda tu Nequi, cédula y correo en <a href="{% url 'lista_pedidos' %}">Ventas</a>.</p>
+  {% endif %}
+</section>
+
+<h2>Retiros a tu Nequi</h2>
+<table>
+  <tr><th>Cuando</th><th>Monto</th><th>Nequi</th><th>Estado</th></tr>
+  {% for r in retiros %}
+    <tr>
+      <td>{{ r.creado|date:"d/m/Y H:i" }}</td>
+      <td>${{ r.monto_cop|floatformat:0|intcomma }}</td>
+      <td>{{ r.destino_nequi }}</td>
+      <td>{{ r.get_estado_display }}{% if r.detalle %}<br><small>{{ r.detalle }}</small>{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4">Aún no autorizas un retiro a tu Nequi.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Autorizar giro al Nequi del vendedor</h2>
+<table>
+  <tr><th>Pedido</th><th>Tienda</th><th>Nequi</th><th>Consignar</th><th>Estado</th><th></th></tr>
+  {% for g in giros_venta %}
+    <tr>
+      <td>#{{ g.pedido_id }}</td>
+      <td>{% if g.pedido.vendedor %}{{ g.pedido.vendedor.nombre_tienda }}{% endif %}</td>
+      <td>{{ g.destino_nequi }}</td>
+      <td>${{ g.monto_cop|floatformat:0|intcomma }}</td>
+      <td>{{ g.get_estado_display }}</td>
+      <td>
+        <form method="post" action="{% url 'tesoreria_accion' %}">{% csrf_token %}
+          <input type="hidden" name="accion" value="autorizar_venta">
+          <input type="hidden" name="giro" value="{{ g.id }}">
+          <input type="hidden" name="next" value="{% url 'tesoreria' %}">
+          <button class="btn" type="submit">Autorizar Wompi</button>
+        </form>
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6">No hay giros de ventas pendientes.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Autorizar giro al Nequi del oferente</h2>
+<table>
+  <tr><th>Cita</th><th>Oferente</th><th>Nequi</th><th>Consignar</th><th>Estado</th><th></th></tr>
+  {% for g in giros_oficio %}
+    <tr>
+      <td>#{{ g.cita_id }}</td>
+      <td>{{ g.cita.oferente.nombre }}</td>
+      <td>{{ g.destino_nequi }}</td>
+      <td>${{ g.monto_cop|floatformat:0|intcomma }}</td>
+      <td>{{ g.get_estado_display }}</td>
+      <td>
+        <form method="post" action="{% url 'tesoreria_accion' %}">{% csrf_token %}
+          <input type="hidden" name="accion" value="autorizar_oficio">
+          <input type="hidden" name="giro" value="{{ g.id }}">
+          <input type="hidden" name="next" value="{% url 'tesoreria' %}">
+          <button class="btn" type="submit">Autorizar Wompi</button>
+        </form>
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6">No hay giros de oficios pendientes.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

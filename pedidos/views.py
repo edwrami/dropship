@@ -146,7 +146,8 @@ def crear_pedido(request, producto_id):
             pk=producto_id,
             activo=True,
         )
-        if producto.vendedor_id and producto.vendedor.estado != "activo":
+        vendedor = producto.vendedor
+        if producto.vendedor_id and vendedor.estado != "activo":
             raise Http404("Producto no disponible")
 
         def _error(msg):
@@ -154,6 +155,8 @@ def crear_pedido(request, producto_id):
 
         if perfil is None:
             return _error("Regístrate con tus datos antes de pedir.")
+        if vendedor and request.user.is_authenticated and vendedor.user_id == request.user.id:
+            return _error("No puedes comprar tu propia mercancía.")
         if producto.controla_stock and producto.stock < cantidad:
             return _error("No hay suficientes unidades.")
 
@@ -185,7 +188,6 @@ def crear_pedido(request, producto_id):
         subtotal = (precio * cantidad + envio).quantize(
             Decimal("1"), rounding=ROUND_HALF_UP,
         )
-        vendedor = producto.vendedor
         pedido = Pedido.objects.create(
             producto=producto,
             vendedor=vendedor,
@@ -217,8 +219,7 @@ def crear_pedido(request, producto_id):
             contacto_nequi=vendedor.nequi if vendedor else "",
             clave_contacto=uuid.uuid4().hex,
         )
-        extra = (pedido.id % 89) + 1
-        pedido.monto_cop = subtotal + extra
+        pedido.monto_cop = subtotal
         pedido.referencia_pago = f"PED-{pedido.id}"
         aplicar_comision(pedido)
         pedido.save()
@@ -231,10 +232,6 @@ def crear_pedido(request, producto_id):
                 "aparecen en este pedido cuando la transferencia quede aprobada."
             ),
         )
-        if producto.controla_stock:
-            producto.stock -= cantidad
-            producto.save(update_fields=["stock"])
-            avisar_stock_bajo(producto)
 
     _marcar_contacto(request, pedido)
     avisar_pedido_nuevo(
@@ -349,11 +346,15 @@ def _aplicar_transaccion(pedido, tx):
     pedido.wompi_id = tx.get("id") or pedido.wompi_id
     pedido.metodo_pago = tx.get("payment_method_type") or pedido.metodo_pago
     if status == "APPROVED":
-        ya_pagado = pedido.estado_pago == "aprobado"
+        if pedido.estado_pago == "aprobado":
+            pedido.save(update_fields=["wompi_id", "metodo_pago"])
+            return
         pedido.estado_pago = "aprobado"
         if pedido.estado == "pendiente":
             pedido.estado = "pagado"
         pedido.save()
+        from vendedores.services import tomar_stock
+        tomar_stock(pedido)
         from .services.pagos import registrar_pago
         registrar_pago(
             pedido, "aprobado", "wompi",
@@ -361,18 +362,20 @@ def _aplicar_transaccion(pedido, tx):
         )
         from .services.giros import repartir
         repartir(pedido)
-        if not ya_pagado:
-            try:
-                avisar_pago(pedido)
-            except Exception:
-                pass
-            try:
-                from productos.tasks import procesar_pedido
-                procesar_pedido(pedido.id)
-            except Exception as e:
-                pedido.notas = f"Pagado. Error al comprar al proveedor: {e}"
-                pedido.save(update_fields=["notas"])
+        try:
+            avisar_pago(pedido)
+        except Exception:
+            pass
+        try:
+            from productos.tasks import procesar_pedido
+            procesar_pedido(pedido.id)
+        except Exception as e:
+            pedido.notas = f"Pagado. Error al comprar al proveedor: {e}"
+            pedido.save(update_fields=["notas"])
     elif status in ("DECLINED", "VOIDED"):
+        if pedido.estado_pago == "aprobado":
+            from vendedores.services import devolver_stock
+            devolver_stock(pedido)
         pedido.estado_pago = "declinado"
         pedido.save()
         from .services.pagos import registrar_pago
@@ -525,7 +528,7 @@ def recibo_pedido(request, pedido_id):
 def avisos(request):
     if not request.user.is_authenticated:
         from django.contrib.auth.views import redirect_to_login
-        return redirect_to_login(request.get_full_path(), login_url="/vendedores/entrar/")
+        return redirect_to_login(request.get_full_path(), login_url="/entrar/")
     qs = Aviso.objects.filter(user=request.user)
     if request.method == "POST":
         qs.filter(leido=False).update(leido=True)
@@ -835,20 +838,25 @@ def _registro_ventas(request):
                 cuenta, _ = CuentaPlataforma.objects.get_or_create(pk=1)
                 cuenta.nequi = numero
                 cuenta.titular = (request.POST.get("titular") or "ERA shop").strip()[:120]
+                cuenta.documento = (request.POST.get("documento") or "").strip()[:40]
+                cuenta.email = (request.POST.get("email") or "").strip()[:120]
                 cuenta.save()
-                messages.success(request, "Nequi de comisiones guardado. Los vendedores lo ven al liquidar.")
+                messages.success(request, "Tu Nequi quedó guardado. Desde Tesorería autorizas el retiro desde Wompi.")
         elif accion == "wompi":
             cuenta, _ = CuentaPlataforma.objects.get_or_create(pk=1)
             publica = (request.POST.get("wompi_publica") or "").strip()
+            privada = (request.POST.get("wompi_privada") or "").strip()
             integridad = (request.POST.get("wompi_integridad") or "").strip()
             eventos = (request.POST.get("wompi_eventos") or "").strip()
             if publica:
                 cuenta.wompi_publica = publica[:200]
+            if privada:
+                cuenta.wompi_privada = privada[:200]
             if integridad:
                 cuenta.wompi_integridad = integridad[:200]
             if eventos:
                 cuenta.wompi_eventos = eventos[:200]
-            if not (publica or integridad or eventos):
+            if not (publica or privada or integridad or eventos):
                 messages.error(request, "Pega al menos la llave pública de Wompi.")
             else:
                 cuenta.save()
@@ -879,18 +887,30 @@ def _registro_ventas(request):
                 messages.error(request, "Pega la API Key y el ID de usuario de Pagos a terceros.")
             else:
                 cuenta.save()
-                from .services.giros import reintentar_pendientes
-                reintentar_pendientes()
-                messages.success(request, "Pagos a terceros guardado. Los giros pendientes se vuelven a intentar.")
+                messages.success(request, "Pagos a terceros guardado. El dinero sigue en Wompi hasta que autorices cada giro en Tesorería.")
         elif accion == "cerrar_reclamo":
             _cerrar_reclamo_plataforma(request)
+        elif accion == "autorizar_venta":
+            from .services.giros import autorizar_giro_venta
+            pedido = get_object_or_404(Pedido, pk=request.POST.get("pedido") or 0)
+            from django.core.exceptions import ObjectDoesNotExist
+            from .services.giros import repartir
+            try:
+                giro = pedido.giro
+            except ObjectDoesNotExist:
+                giro = repartir(pedido)
+            if giro:
+                giro = autorizar_giro_venta(giro)
+                messages.success(request, f"Giro pedido #{pedido.id}: {giro.get_estado_display()}. {giro.detalle}")
+            else:
+                messages.error(request, "Ese pedido no tiene restante para girar.")
         elif accion == "pagar_vendedor":
             pedido = get_object_or_404(Pedido, pk=request.POST.get("pedido") or 0)
             from .services.giros import marcar_pago_manual
             giro = marcar_pago_manual(pedido, (request.POST.get("comprobante") or "").strip()[:120])
             if giro and giro.estado == "pagado":
                 tienda = pedido.vendedor.nombre_tienda if pedido.vendedor_id else "la tienda"
-                messages.success(request, f"Pagado. Quedó consignado el restante de {tienda}, pedido #{pedido.id}.")
+                messages.success(request, f"Marcado a mano. Quedó consignado el restante de {tienda}, pedido #{pedido.id}.")
             else:
                 messages.error(request, "Ese pedido todavía no tiene un pago confirmado para consignar.")
         else:
@@ -980,7 +1000,10 @@ def _registro_ventas(request):
     reportado = qs.filter(estado_comision="reportada").aggregate(s=Sum("comision_cop"))["s"] or 0
     pagado = qs.filter(estado_comision="pagada").aggregate(s=Sum("comision_cop"))["s"] or 0
     pagina = Paginator(qs.distinct(), 40).get_page(request.GET.get("p"))
+    from .tesoreria import contexto_tesoreria
+    tesoro = contexto_tesoreria()
     nequi, titular = nequi_plataforma()
+    cuenta = tesoro.get("cuenta_era")
     por_pagar = (
         Pedido.objects.filter(estado_pago="aprobado", vendedor__isnull=False)
         .filter(Q(giro__isnull=True) | ~Q(giro__estado="pagado"))
@@ -1014,6 +1037,9 @@ def _registro_ventas(request):
         "comisiones": Pedido.ESTADOS_COMISION,
         "nequi": nequi,
         "titular": titular,
+        "documento_era": (cuenta.documento if cuenta else "") or "",
+        "email_era": (cuenta.email if cuenta else "") or "",
+        "saldo_era": tesoro["saldo_era"],
         "wompi_conectado": wompi.checkout_listo(),
         "webhook_url": request.build_absolute_uri("/pedidos/wompi/evento/"),
         "cobros": cobros,

@@ -1,15 +1,18 @@
 import re
+from decimal import Decimal
+from types import SimpleNamespace
 
 import requests
+from django.db.models import Sum
 from django.utils import timezone
 
-from pedidos.models import CuentaPlataforma, Giro, MensajePedido
+from pedidos.models import CuentaPlataforma, Giro, MensajePedido, Pedido, RetiroPlataforma
 
 BASE = "https://api.payouts.wompi.co/v1"
 
 
 def repartir(pedido):
-    """Deja el 10% en ERA shop y ordena el 90% al Nequi del vendedor."""
+    """Anota el restante del vendedor. El dinero se queda en Wompi hasta que ERA shop autorice el giro."""
     if not pedido.vendedor_id:
         return None
     if pedido.estado_comision not in ("anulada", "vencida", "retenida", "pagada"):
@@ -26,20 +29,31 @@ def repartir(pedido):
             "destino_nequi": (vendedor.nequi or "")[:20],
         },
     )
-    if giro.estado == "pagado":
+    if giro.estado in ("pagado", "enviado"):
         return giro
-    antes = giro.estado
     giro.monto_cop = pedido.neto_vendedor or 0
     giro.comision_cop = pedido.comision_cop or 0
     giro.destino_nequi = (vendedor.nequi or giro.destino_nequi or "")[:20]
-    try:
-        _enviar(giro, vendedor)
-    except Exception:
+    if not giro.payout_id:
         giro.estado = "pendiente"
-        giro.detalle = "No se pudo ordenar el giro. Quedó pendiente y se reintenta."
+        giro.detalle = "El dinero sigue en Wompi. ERA shop autoriza el giro al Nequi."
         giro.save()
-    if creado or giro.estado != antes:
+    if creado:
         _anotar(pedido, giro)
+    return giro
+
+
+def autorizar_giro_venta(giro):
+    """Saca de Wompi el restante y lo manda al Nequi del vendedor. Solo con autorización."""
+    if giro is None or giro.estado in ("pagado", "enviado"):
+        return giro
+    pedido = giro.pedido
+    if pedido.estado_pago != "aprobado" or not pedido.vendedor_id:
+        return giro
+    giro.monto_cop = pedido.neto_vendedor or giro.monto_cop
+    giro.destino_nequi = (pedido.vendedor.nequi or giro.destino_nequi or "")[:20]
+    _enviar(giro, pedido.vendedor, f"giro-{pedido.id}")
+    _anotar(pedido, giro)
     return giro
 
 
@@ -85,7 +99,7 @@ def marcar_pago_manual(pedido, comprobante=""):
             "destino_nequi": (vendedor.nequi or "")[:20],
         },
     )
-    if giro.estado == "pagado":
+    if giro.estado in ("pagado", "enviado"):
         return giro
     giro.monto_cop = pedido.neto_vendedor or 0
     giro.comision_cop = pedido.comision_cop or 0
@@ -99,37 +113,41 @@ def marcar_pago_manual(pedido, comprobante=""):
 
 
 def reintentar_pendientes(vendedor=None):
-    qs = Giro.objects.select_related("pedido__vendedor__user").exclude(estado__in=["pagado", "rechazado"])
+    """No gira solo. Solo actualiza giros que ya autorizaste y Wompi está procesando."""
+    qs = Giro.objects.filter(estado="enviado").exclude(payout_id="").select_related("pedido")
     if vendedor is not None:
         qs = qs.filter(pedido__vendedor=vendedor)
-    for giro in qs[:30]:
-        repartir(giro.pedido)
+    for giro in qs[:40]:
+        actualizar(giro)
 
 
-def _enviar(giro, vendedor):
+def _enviar(giro, vendedor, referencia=None):
     if giro.payout_id:
         giro.estado = "enviado"
         giro.save()
         return
+    referencia = referencia or f"giro-{getattr(giro, 'pedido_id', giro.pk)}"
     nequi = re.sub(r"\D", "", giro.destino_nequi or "")
-    documento = re.sub(r"\D", "", vendedor.documento or "")
+    documento = re.sub(r"\D", "", getattr(vendedor, "documento", "") or "")
     email = ""
-    if vendedor.user_id:
+    if getattr(vendedor, "user_id", None):
         email = (vendedor.user.email or "").strip()
-    if len(nequi) != 10 or not documento or not email or not (vendedor.responsable or "").strip():
+    email = email or (getattr(vendedor, "email", "") or "").strip()
+    nombre = (getattr(vendedor, "responsable", "") or getattr(vendedor, "titular", "") or "").strip()
+    if len(nequi) != 10 or not documento or not email or not nombre:
         giro.estado = "sin_datos"
-        giro.detalle = "El vendedor debe tener Nequi, cédula, nombre y correo en la tienda."
+        giro.detalle = "Faltan Nequi de 10 dígitos, cédula, nombre y correo para el giro."
         giro.save()
         return
     if int(giro.monto_cop or 0) <= 0:
         giro.estado = "rechazado"
-        giro.detalle = "El valor para el vendedor es cero."
+        giro.detalle = "El valor a girar es cero."
         giro.save()
         return
     cuenta = _cuenta()
     if not _llaves(cuenta):
         giro.estado = "pendiente"
-        giro.detalle = "El restante queda anotado, ya sin la comisión de ERA shop ni la tarifa de Wompi. ERA shop lo consigna a mano."
+        giro.detalle = "Faltan las llaves de Pagos a terceros. El dinero sigue en Wompi hasta que las conectes y autorices."
         giro.save()
         return
     banco = _banco_nequi(cuenta)
@@ -143,7 +161,7 @@ def _enviar(giro, vendedor):
         cuenta.payouts_account_id = origen[:80]
         cuenta.save(update_fields=["payouts_account_id"])
     cuerpo = {
-        "reference": f"giro-{giro.pedido_id}",
+        "reference": referencia[:80],
         "accountId": origen,
         "paymentType": "OTHER",
         "transactions": [{
@@ -152,15 +170,15 @@ def _enviar(giro, vendedor):
             "bankId": banco,
             "accountType": "AHORROS",
             "accountNumber": nequi,
-            "name": vendedor.responsable[:80],
+            "name": nombre[:80],
             "email": email[:120],
             "amount": int(giro.monto_cop) * 100,
-            "reference": f"giro-{giro.pedido_id}",
+            "reference": referencia[:80],
         }],
     }
     respuesta = requests.post(
         f"{BASE}/payouts",
-        headers=_headers(cuenta, f"giro-{giro.pedido_id}"),
+        headers=_headers(cuenta, referencia[:64]),
         json=cuerpo,
         timeout=20,
     )
@@ -288,3 +306,52 @@ def _anotar(pedido, giro):
             f"{giro.get_estado_display()}. {giro.detalle}"
         ).strip(),
     )
+
+
+def saldo_era_en_wompi():
+    """Lo de ERA shop que sigue en Wompi: cuotas e inscripciones + comisiones, menos retiros ya enviados."""
+    from servicios.models import Cita, PagoActivacion, PagoExtra, PagoMensualidad
+
+    total = Decimal("0")
+    total += PagoActivacion.objects.filter(estado_pago="aprobado").aggregate(s=Sum("monto_cop"))["s"] or 0
+    total += PagoMensualidad.objects.filter(estado_pago="aprobado").aggregate(s=Sum("monto_cop"))["s"] or 0
+    total += PagoExtra.objects.filter(estado_pago="aprobado").aggregate(s=Sum("monto_cop"))["s"] or 0
+    total += Pedido.objects.filter(estado_pago="aprobado").aggregate(s=Sum("comision_cop"))["s"] or 0
+    total += Cita.objects.filter(estado_pago="aprobado").aggregate(s=Sum("comision_cop"))["s"] or 0
+    salido = RetiroPlataforma.objects.filter(estado__in=("enviado", "pagado")).aggregate(s=Sum("monto_cop"))["s"] or 0
+    queda = total - salido
+    return queda if queda > 0 else Decimal("0")
+
+
+def retirar_a_mi_nequi(monto):
+    """Autoriza sacar de Wompi la comisión/cuotas de ERA shop hacia el Nequi de la cuenta."""
+    cuenta = _cuenta()
+    if cuenta is None:
+        return None, "Guarda primero tu Nequi, cédula y correo en Ventas."
+    try:
+        monto = Decimal(str(monto or 0))
+    except Exception:
+        return None, "Escribe un monto válido."
+    monto = monto.quantize(Decimal("1"))
+    if monto <= 0:
+        return None, "El monto debe ser mayor a cero."
+    disponible = saldo_era_en_wompi()
+    if monto > disponible:
+        return None, f"En Wompi de ERA shop hay ${disponible}. No puedes retirar más."
+    retiro = RetiroPlataforma.objects.create(
+        monto_cop=monto,
+        destino_nequi=(cuenta.nequi or "")[:20],
+        estado="pendiente",
+        detalle="Autorizado. Saliendo de Wompi a tu Nequi.",
+    )
+    persona = SimpleNamespace(
+        documento=cuenta.documento or "",
+        responsable=cuenta.titular or "ERA shop",
+        email=cuenta.email or "",
+        user_id=None,
+        user=None,
+        titular=cuenta.titular or "ERA shop",
+    )
+    retiro.destino_nequi = (cuenta.nequi or "")[:20]
+    _enviar(retiro, persona, f"era-{retiro.id}")
+    return retiro, None

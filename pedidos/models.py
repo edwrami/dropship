@@ -84,6 +84,7 @@ class Pedido(models.Model):
 
     estado = models.CharField(max_length=20, choices=ESTADOS, default="pendiente")
     estado_pago = models.CharField(max_length=20, choices=ESTADOS_PAGO, default="pendiente")
+    stock_tomado = models.BooleanField(default=False)
     referencia_pago = models.CharField(max_length=80, unique=True, blank=True)
     wompi_id = models.CharField(max_length=80, blank=True)
     comprobante = models.CharField(max_length=120, blank=True)
@@ -279,7 +280,10 @@ class Giro(models.Model):
 class CuentaPlataforma(models.Model):
     titular = models.CharField(max_length=120, blank=True, default="ERA shop")
     nequi = models.CharField(max_length=20, blank=True)
+    documento = models.CharField(max_length=40, blank=True)
+    email = models.EmailField(blank=True)
     wompi_publica = models.CharField(max_length=200, blank=True)
+    wompi_privada = models.CharField(max_length=200, blank=True)
     wompi_integridad = models.CharField(max_length=200, blank=True)
     wompi_eventos = models.CharField(max_length=200, blank=True)
     payouts_api_key = models.CharField(max_length=200, blank=True)
@@ -295,6 +299,28 @@ class CuentaPlataforma(models.Model):
 
     def __str__(self):
         return self.nequi or "Nequi de ERA shop"
+
+
+class RetiroPlataforma(models.Model):
+    ESTADOS = [
+        ("pendiente", "Pendiente en Wompi"),
+        ("sin_datos", "Faltan datos de tu Nequi"),
+        ("enviado", "Enviado a Wompi"),
+        ("pagado", "Pagado a tu Nequi"),
+        ("rechazado", "Rechazado"),
+    ]
+    monto_cop = models.DecimalField(max_digits=14, decimal_places=2)
+    destino_nequi = models.CharField(max_length=20, blank=True)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default="pendiente", db_index=True)
+    payout_id = models.CharField(max_length=80, blank=True)
+    detalle = models.CharField(max_length=300, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creado"]
+
+    def __str__(self):
+        return f"Retiro ${self.monto_cop} · {self.estado}"
 
 
 class Aviso(models.Model):

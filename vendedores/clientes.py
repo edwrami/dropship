@@ -57,59 +57,14 @@ def _proveedores():
     )
 
 
-@transaction.atomic
 def registro_cliente(request):
-    if _cliente(request.user):
-        return redirect(_siguiente(request, "/clientes/mis-proveedores/"))
-    form = RegistroClienteForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        data = form.cleaned_data
-        user = User.objects.create_user(
-            username=data["email"],
-            email=data["email"],
-            password=data["password"],
-        )
-        ClienteTienda.objects.create(
-            user=user,
-            nombre_tienda=data["nombre_tienda"].strip(),
-            responsable=data["responsable"].strip(),
-            documento=data["documento"].strip(),
-            telefono=data["telefono"],
-            direccion=data["direccion"].strip(),
-            barrio=(data.get("barrio") or "").strip(),
-            ciudad=data["ciudad"].strip(),
-            departamento=data["departamento"],
-            referencia=(data.get("referencia") or "").strip(),
-        )
-        login(request, user)
-        messages.success(request, "Establecimiento registrado. Esos datos quedan en ERA shop y se copian en cada pedido.")
-        return redirect(_siguiente(request, "/clientes/proveedores/"))
-    return render(request, "clientes/registro.html", {
-        "form": form,
-        "next": request.GET.get("next", ""),
-    })
+    from . import cuentas
+    return cuentas.registro_establecimiento(request)
 
 
 def entrar_cliente(request):
-    if _cliente(request.user):
-        return redirect(_siguiente(request, "/clientes/mis-proveedores/"))
-    error = ""
-    if request.method == "POST":
-        email = (request.POST.get("email") or "").strip().lower()
-        user = authenticate(request, username=email, password=request.POST.get("password") or "")
-        if user is None:
-            error = "Correo o contraseña incorrectos."
-        else:
-            login(request, user)
-            if _cliente(user) is None:
-                logout(request)
-                error = "Esa cuenta no es de un establecimiento. Entra por Registrarme o por Vender."
-            else:
-                return redirect(_siguiente(request, "/clientes/mis-proveedores/"))
-    return render(request, "clientes/entrar.html", {
-        "error": error,
-        "next": request.POST.get("next") or request.GET.get("next", ""),
-    })
+    from . import cuentas
+    return cuentas.entrar_cuenta(request)
 
 
 def proveedores_mayor(request):
@@ -136,20 +91,20 @@ def proveedores_mayor(request):
     })
 
 
-@login_required(login_url="entrar_cliente")
+@login_required(login_url="entrar_cuenta")
 @require_POST
 def conectar_proveedor(request, slug):
     cliente = _cliente(request.user)
     if cliente is None:
-        messages.error(request, "Entra con la cuenta de tu tienda para conectarte.")
-        return redirect("entrar_cliente")
+        messages.error(request, "Completa el establecimiento para comprar al por mayor. El correo es el mismo.")
+        return redirect("registro_cliente")
     proveedor = get_object_or_404(Vendedor, slug=slug, estado="activo", tipo__in=TIPOS_PROVEEDOR)
     Conexion.objects.get_or_create(cliente=cliente, proveedor=proveedor)
     messages.success(request, f"Conectado con {proveedor.nombre_tienda}. Ya ves su lista al por mayor.")
     return redirect("lista_mayorista", slug=proveedor.slug)
 
 
-@login_required(login_url="entrar_cliente")
+@login_required(login_url="entrar_cuenta")
 @require_POST
 def desconectar_proveedor(request, slug):
     cliente = _cliente(request.user)
@@ -271,7 +226,7 @@ def _filas_carrito(carrito):
     return filas, peso(bienes), peso(envio), unidades
 
 
-@login_required(login_url="entrar_cliente")
+@login_required(login_url="entrar_cuenta")
 def lista_mayorista(request, slug):
     cliente, proveedor, respuesta = _exigir_conexion(request, slug)
     if respuesta:
@@ -303,7 +258,7 @@ def lista_mayorista(request, slug):
     })
 
 
-@login_required(login_url="entrar_cliente")
+@login_required(login_url="entrar_cuenta")
 @require_POST
 def agregar_carrito(request, slug):
     cliente, proveedor, respuesta = _exigir_conexion(request, slug)
@@ -337,7 +292,7 @@ def agregar_carrito(request, slug):
     return destino
 
 
-@login_required(login_url="entrar_cliente")
+@login_required(login_url="entrar_cuenta")
 def carrito_pedido(request, slug):
     cliente, proveedor, respuesta = _exigir_conexion(request, slug)
     if respuesta:
@@ -426,6 +381,9 @@ def _confirmar_carrito(request, cliente, proveedor, carrito):
         if not producto.activo or producto.precio_mayor_cop is None:
             errores.append(f"{titulo} ya no está en la lista.")
             continue
+        if producto.vendedor_id and cliente.user_id == producto.vendedor.user_id:
+            errores.append(f"No puedes pedir tu propio producto ({titulo}).")
+            continue
         if producto.controla_stock and producto.stock < cantidad:
             errores.append(f"De {titulo} solo hay {producto.stock}.")
             continue
@@ -492,11 +450,6 @@ def _confirmar_carrito(request, cliente, proveedor, carrito):
             envio_cop=envio_linea,
             subtotal_cop=subtotal,
         )
-        if producto.controla_stock:
-            producto.stock -= cantidad
-            producto.save(update_fields=["stock"])
-            from pedidos.avisos import avisar_stock_bajo
-            avisar_stock_bajo(producto)
         linea.delete()
         textos.append(f"{producto.titulo}: {cantidad} × ${peso(precio)}")
     factura = "Factura con IVA." if con_iva else "Factura sin IVA."
@@ -552,59 +505,16 @@ def historial_comprador(request):
 
 
 def registro_comprador(request):
-    if _comprador(request.user):
-        return redirect(_siguiente(request, "/clientes/cuenta/"))
-    form = RegistroCompradorForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        data = form.cleaned_data
-        user = User.objects.create_user(
-            username=data["email"],
-            email=data["email"],
-            password=data["password"],
-        )
-        Comprador.objects.create(
-            user=user,
-            nombre=data["nombre"].strip(),
-            documento=data["documento"],
-            telefono=data["telefono"],
-            direccion=data["direccion"].strip(),
-            barrio=(data.get("barrio") or "").strip(),
-            ciudad=data["ciudad"].strip(),
-            departamento=data["departamento"],
-            referencia=(data.get("referencia") or "").strip(),
-        )
-        login(request, user)
-        messages.success(request, "Registro guardado. Ya puedes hacer el pedido.")
-        return redirect(_siguiente(request, "/clientes/cuenta/"))
-    return render(request, "clientes/registro_comprador.html", {
-        "form": form,
-        "next": request.GET.get("next", ""),
-    })
+    from . import cuentas
+    return cuentas.registro_cliente(request)
 
 
 def entrar_comprador(request):
-    if _comprador(request.user):
-        return redirect(_siguiente(request, "/clientes/cuenta/"))
-    error = ""
-    if request.method == "POST":
-        email = (request.POST.get("email") or "").strip().lower()
-        user = authenticate(request, username=email, password=request.POST.get("password") or "")
-        if user is None:
-            error = "Correo o contraseña incorrectos."
-        else:
-            login(request, user)
-            if _comprador(user) is None:
-                logout(request)
-                error = "Esa cuenta no es de comprador. Una tienda entra por Soy tienda y un vendedor por Vender."
-            else:
-                return redirect(_siguiente(request, "/clientes/cuenta/"))
-    return render(request, "clientes/entrar_comprador.html", {
-        "error": error,
-        "next": request.POST.get("next") or request.GET.get("next", ""),
-    })
+    from . import cuentas
+    return cuentas.entrar_cuenta(request)
 
 
-@login_required(login_url="entrar_comprador")
+@login_required(login_url="entrar_cuenta")
 def datos_comprador(request):
     comprador = _comprador(request.user)
     if comprador is None:
@@ -625,7 +535,7 @@ def datos_comprador(request):
     return render(request, "clientes/cuenta.html", ctx)
 
 
-@login_required(login_url="entrar_cliente")
+@login_required(login_url="entrar_cuenta")
 def mis_proveedores(request):
     cliente = _cliente(request.user)
     if cliente is None:
@@ -719,9 +629,12 @@ def agregar_compra(request):
     if producto is None or (producto.vendedor_id and producto.vendedor.estado != "activo"):
         messages.error(request, "Ese producto ya no está disponible.")
         return redirect("lista_productos")
+    if producto.vendedor_id and request.user.is_authenticated and producto.vendedor.user_id == request.user.id:
+        messages.error(request, "No puedes comprar tu propia mercancía.")
+        return redirect("detalle_producto", producto.pk)
     comprador = _comprador(request.user)
     if comprador is None:
-        return redirect(f"/clientes/cuenta/registro/?next=/producto/{producto.pk}/")
+        return redirect(f"/registro/?rol=cliente&next=/producto/{producto.pk}/")
     try:
         cantidad = int(request.POST.get("cantidad") or 1)
     except (TypeError, ValueError):
@@ -738,7 +651,7 @@ def agregar_compra(request):
     return redirect("carrito_compra")
 
 
-@login_required(login_url="entrar_comprador")
+@login_required(login_url="entrar_cuenta")
 def carrito_compra(request):
     comprador = _comprador(request.user)
     if comprador is None:
@@ -806,6 +719,8 @@ def _cerrar_carrito(comprador, carrito):
             vendedor = linea.producto.vendedor
             if producto is None or not producto.activo or (vendedor and vendedor.estado != "activo"):
                 return None, "Hay un producto que ya no está disponible. Quítalo del carrito."
+            if vendedor and vendedor.user_id == comprador.user_id:
+                return None, f"Quita {producto.titulo}: no puedes comprarte a ti mismo."
             cantidad = max(1, min(linea.cantidad, 20))
             if producto.controla_stock and producto.stock < cantidad:
                 return None, f"No hay suficientes unidades de {producto.titulo}."
@@ -876,13 +791,6 @@ def _cerrar_carrito(comprador, carrito):
                         subtotal_cop=item["subtotal"],
                     )
             pedidos.append(pedido)
-            for item in items:
-                producto = item["producto"]
-                if producto.controla_stock:
-                    producto.stock -= item["cantidad"]
-                    producto.save(update_fields=["stock"])
-                    from pedidos.avisos import avisar_stock_bajo
-                    avisar_stock_bajo(producto)
         cargos_mostrador_grupo(pedidos)
         for pedido in pedidos:
             pedido.save()
@@ -928,7 +836,7 @@ def _compra_visible(request, compra):
     return bool(clave and clave == compra.clave_contacto)
 
 
-@login_required(login_url="entrar_comprador")
+@login_required(login_url="entrar_cuenta")
 def pagar_compra(request, compra_id):
     compra = get_object_or_404(Compra.objects.prefetch_related("pedidos__producto", "pedidos__lineas"), pk=compra_id)
     if not _compra_visible(request, compra):

@@ -28,33 +28,40 @@
         <a href="{% url 'publicar_producto' %}">Publicar producto</a>
         <a href="{% url 'vender_mayor' %}">Vender al por mayor</a>
         {% if user.is_authenticated %}
+          <a href="{% url 'mi_panel' %}">Mi panel</a>
           <a href="{% url 'avisos' %}">Avisos{% if avisos_sin_leer %} ({{ avisos_sin_leer }}){% endif %}</a>
         {% endif %}
         {% if user.is_staff %}
           <a href="{% url 'lista_pedidos' %}">Ventas</a>
+          <a href="{% url 'tesoreria' %}">Wompi</a>
           <a href="{% url 'admin_consignaciones' %}">Consignar servicios</a>
           <a href="{% url 'admin_servicios' %}">Admin servicios</a>
           <a href="{% url 'reputacion' %}">Visitas</a>
         {% endif %}
         {% if oferente_actual %}
           <a href="{% url 'panel_oferente' %}">Mi servicio</a>
+        {% elif user.is_authenticated %}
+          <a href="{% url 'registro_oferente' %}">Ofrecer oficio</a>
         {% endif %}
         {% if vendedor_actual %}
           <a href="{% url 'panel_vendedor' %}">Mi tienda</a>
-          <a href="{% url 'salir_vendedor' %}">Salir</a>
-        {% elif cliente_actual %}
+        {% elif user.is_authenticated %}
+          <a href="{% url 'registro_cuenta' %}?rol=detal">Vender con esta cuenta</a>
+        {% endif %}
+        {% if cliente_actual %}
           <a href="{% url 'mis_proveedores' %}">Mis proveedores</a>
           {% if pedido_armado %}<a href="{% url 'mis_proveedores' %}">Pedido ({{ pedido_armado }})</a>{% endif %}
-          <a href="{% url 'salir_vendedor' %}">Salir</a>
-        {% elif comprador_actual %}
+        {% endif %}
+        {% if comprador_actual %}
           <a href="{% url 'datos_comprador' %}">Mi cuenta</a>
           <a href="{% url 'carrito_compra' %}">Carrito{% if carrito_unidades %} ({{ carrito_unidades }}){% endif %}</a>
           <a href="{% url 'historial_comprador' %}">Mis pedidos</a>
+        {% endif %}
+        {% if user.is_authenticated %}
           <a href="{% url 'salir_vendedor' %}">Salir</a>
-        {% elif oferente_actual %}
-          <a href="{% url 'salir_oferente' %}">Salir</a>
         {% else %}
-          <a href="{% url 'registro_comprador' %}">Registrarme</a>
+          <a href="{% url 'registro_cuenta' %}">Registrarme</a>
+          <a href="{% url 'entrar_cuenta' %}">Entrar</a>
         {% endif %}
       </nav>
     </div>

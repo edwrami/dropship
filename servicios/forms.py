@@ -47,7 +47,7 @@ class RegistroOferenteForm(forms.Form):
         help_text="Las obras largas se reservan por días o semanas. Barbería y uñas, por cita.",
     )
     acepta_terminos = forms.BooleanField(
-        label="Acepto pagar $100.000 por Wompi para un oficio en un municipio. Cada ciudad u oficio extra vale otros $100.000",
+        label="Acepto pagar $100.000 de inscripción (incluye el primer mes), $50.000 cada mes siguiente para aparecer, y la comisión de ERA shop en cada cita. Cada ciudad u oficio extra vale otros $100.000",
     )
 
     def __init__(self, *args, **kwargs):
@@ -82,9 +82,7 @@ class RegistroOferenteForm(forms.Form):
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
         if self.usuario and self.usuario.is_authenticated:
-            return email
-        if User.objects.filter(username=email).exists():
-            raise forms.ValidationError("Ese correo ya está. Entra y publica el servicio con esa cuenta.")
+            return (self.usuario.email or self.usuario.username).strip().lower()
         return email
 
     def clean_nombre(self):
@@ -97,11 +95,17 @@ class RegistroOferenteForm(forms.Form):
     def clean(self):
         data = super().clean()
         autenticado = self.usuario and self.usuario.is_authenticated
-        if not autenticado:
+        email = data.get("email")
+        if autenticado:
+            return data
+        if email and User.objects.filter(username=email).exists():
             if not data.get("password"):
-                self.add_error("password", "Escribe una contraseña.")
-            elif data.get("password") != data.get("password2"):
-                self.add_error("password2", "Las contraseñas no coinciden.")
+                self.add_error("password", "Escribe la contraseña de esa cuenta para ofrecer oficios con el mismo correo.")
+            return data
+        if not data.get("password"):
+            self.add_error("password", "Escribe una contraseña.")
+        elif data.get("password") != data.get("password2"):
+            self.add_error("password2", "Las contraseñas no coinciden.")
         return data
 
 

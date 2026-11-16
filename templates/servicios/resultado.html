@@ -16,30 +16,34 @@
       <p>{{ cita.oferente.ciudad }}, {{ cita.oferente.departamento }}</p>
     </section>
   {% endif %}
-  {% if cita.trabajo_realizado %}
-    <div class="ok">El cliente marcó el trabajo como realizado. El pago al oferente ya puede girarse.</div>
-  {% elif puede_cerrar %}
-    <form method="post">{% csrf_token %}
-      <input type="hidden" name="clave" value="{{ clave }}">
-      <input type="hidden" name="realizar" value="1">
-      <p>Cuando el oficio esté listo, márcalo. Recién ahí ERA shop le gira el restante al oferente.</p>
-      <button class="btn" type="submit">Marcar trabajo realizado</button>
-    </form>
+  {% if cita.trabajo_realizado and ya_comento %}
+    <div class="ok">El cliente marcó el trabajo como realizado y lo calificó. ERA shop ya puede consignar el restante al Nequi del oferente.</div>
+  {% elif puede_cerrar or form %}
+    <section class="card">
+      <h3>Cerrar el servicio</h3>
+      <p>El giro al Nequi del oferente sale cuando marcas el trabajo como realizado <strong>y</strong> lo calificas. ERA shop retiene su comisión y la tarifa de Wompi.</p>
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="clave" value="{{ clave }}">
+        <input type="hidden" name="cerrar" value="1">
+        {% if form %}
+          {{ form.as_p }}
+        {% elif ya_comento %}
+          <p class="muted">La calificación ya quedó. Confirma que el trabajo se hizo.</p>
+        {% endif %}
+        {% if puede_cerrar %}
+          <button class="btn" type="submit">Marcar realizado y calificar</button>
+        {% else %}
+          <button class="btn" type="submit">Enviar calificación</button>
+        {% endif %}
+      </form>
+    </section>
   {% elif pagado %}
-    <p class="note">El oferente espera a que el cliente marque el trabajo como realizado para recibir el giro.</p>
-  {% endif %}
-  {% if form %}
-    <h3>Califica este servicio</h3>
-    <form method="post">{% csrf_token %}
-      <input type="hidden" name="clave" value="{{ clave }}">
-      <input type="hidden" name="comentar" value="1">
-      {{ form.as_p }}
-      <button class="btn" type="submit">Enviar calificación</button>
-    </form>
+    <p class="note">El oferente espera a que el cliente marque el trabajo como realizado y lo califique para recibir el giro.</p>
   {% endif %}
 {% else %}
   <div class="note">El pago aún no está confirmado. El hueco se guarda un rato mientras pagas.</div>
   <p><a class="btn" href="{% url 'pagar_cita' cita.id %}?clave={{ clave }}">Volver a pagar</a></p>
 {% endif %}
-<p><a class="btn sec" href="{% url 'detalle_oferente' cita.oferente.slug %}">Volver a la ficha</a></p>
+<p><a class="btn sec" href="{% url 'detalle_oferente' cita.oferente.slug %}">Volver a la ficha</a>
+   <a class="btn sec" href="{% url 'mi_panel' %}">Mi panel</a></p>
 {% endblock %}

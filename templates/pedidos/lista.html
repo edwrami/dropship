@@ -5,7 +5,11 @@
   <p class="kicker">ERA shop</p>
   <h2>Registro de ventas</h2>
   <p class="muted">Cada venta con la tienda, el cliente, las cantidades y la comisión. Busca por nombre, teléfono, ciudad, referencia, producto o documento.</p>
-  <p><a class="btn sec" href="{% url 'reputacion' %}">Visitas y calificaciones</a></p>
+  <p>
+    <a class="btn" href="{% url 'tesoreria' %}">Dinero en Wompi</a>
+    <a class="btn sec" href="{% url 'reputacion' %}">Visitas y calificaciones</a>
+  </p>
+  <p class="note">El pago del cliente entra a Wompi y se queda ahí. Tú autorizas el envío a tu Nequi (lo de ERA shop) o al Nequi del vendedor. En Wompi hay ${{ saldo_era|default:0|floatformat:0|intcomma }} de ERA shop.</p>
 
   <div class="pay-grid">
     <section class="card">
@@ -32,8 +36,10 @@
 
   <form method="post" class="card" style="max-width:520px">{% csrf_token %}
     <input type="hidden" name="accion" value="nequi">
-    <p>Este Nequi es solo para la comisión que te consignan las tiendas. El pago del cliente no entra aquí: entra por la página.</p>
+    <p>Este Nequi es el tuyo. El cliente paga en Wompi; cuando autorices, Wompi gira aquí lo de ERA shop (comisiones e inscripciones).</p>
     <label>Titular<input name="titular" value="{{ titular }}"></label>
+    <label>Cédula<input name="documento" value="{{ documento_era }}" placeholder="Para el giro de Wompi"></label>
+    <label>Correo<input type="email" name="email" value="{{ email_era }}"></label>
     <label>Tu Nequi<input name="nequi" value="{{ nequi }}" placeholder="10 dígitos, empieza por 3" required></label>
     <button class="btn" type="submit">Guardar Nequi</button>
   </form>
@@ -43,6 +49,7 @@
     <p>Aquí cobra el cliente: Nequi, PSE o tarjeta, dentro de la página. El dinero entra a tu cuenta Wompi y el pago queda registrado solo. {% if wompi_conectado %}Wompi ya está conectado. Si pegas otra llave, reemplaza la anterior.{% else %}Pega las tres llaves de tu cuenta Wompi.{% endif %}</p>
     <p class="muted">En Wompi, la URL de eventos es {{ webhook_url }}</p>
     <label>Llave pública<input name="wompi_publica" autocomplete="off"></label>
+    <label>Llave privada<input name="wompi_privada" type="password" autocomplete="off"></label>
     <label>Secreto de integridad<input name="wompi_integridad" type="password" autocomplete="off"></label>
     <label>Secreto de eventos<input name="wompi_eventos" type="password" autocomplete="off"></label>
     <button class="btn" type="submit">Guardar Wompi</button>
@@ -50,7 +57,7 @@
 
   <form method="post" class="card" style="max-width:520px">{% csrf_token %}
     <input type="hidden" name="accion" value="payouts">
-    <p>Para girar el restante al Nequi del vendedor, activa Pagos a terceros en Wompi y pega aquí la API Key y el ID de usuario principal. En ERA shop se queda el {{ comision_detalle_pct|floatformat:-2 }}% del mostrador o el {{ comision_mayor_pct|floatformat:-2 }}% del por mayor.</p>
+    <p>Pagos a terceros sirve para que, cuando <strong>tú autorices</strong>, Wompi gire desde tu saldo a un Nequi (el tuyo o el del vendedor). Sin tu autorización el dinero no sale. En ERA shop se queda el {{ comision_detalle_pct|floatformat:-2 }}% del mostrador o el {{ comision_mayor_pct|floatformat:-2 }}% del por mayor.</p>
     <label>API Key de Pagos a terceros<input name="payouts_api_key" type="password" autocomplete="off"></label>
     <label>ID de usuario principal<input name="payouts_user_id" autocomplete="off"></label>
     <button class="btn" type="submit">Guardar giro a vendedores</button>
@@ -99,10 +106,15 @@
               <p>Esta tienda no tiene Nequi. Consigna cuando lo tenga escrito y márcalo.</p>
             {% endif %}
             <form method="post">{% csrf_token %}
+              <input type="hidden" name="accion" value="autorizar_venta">
+              <input type="hidden" name="pedido" value="{{ linea.pedido.id }}">
+              <button class="btn" type="submit">Autorizar giro Wompi a su Nequi</button>
+            </form>
+            <form method="post">{% csrf_token %}
               <input type="hidden" name="accion" value="pagar_vendedor">
               <input type="hidden" name="pedido" value="{{ linea.pedido.id }}">
-              <label>Número de la transferencia<input name="comprobante" placeholder="El que muestra tu Nequi"></label>
-              <button class="btn" type="submit">Marcar pagado</button>
+              <label>Si ya lo consignaste a mano<input name="comprobante" placeholder="Número de la transferencia"></label>
+              <button class="btn sec" type="submit">Marcar pagado a mano</button>
             </form>
           {% endif %}
         {% endfor %}

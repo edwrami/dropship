@@ -76,4 +76,4 @@ class GiroAdmin(admin.ModelAdmin):
 @admin.register(CuentaPlataforma)
 class CuentaPlataformaAdmin(admin.ModelAdmin):
     list_display = ("titular", "nequi", "comision_detalle_pct", "comision_mayor_pct", "wompi_publica")
-    exclude = ("wompi_integridad", "wompi_eventos", "payouts_api_key")
+    exclude = ("wompi_integridad", "wompi_eventos", "wompi_privada", "payouts_api_key")

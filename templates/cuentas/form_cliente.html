@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Registro de cliente · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Cliente</p>
+<h2>Registro para comprar</h2>
+<p class="muted">Estos datos se copian en cada pedido. Si más adelante quieres vender, usas el mismo correo y eliges vendedor al detal o mayorista.</p>
+{% if logueado %}
+  <div class="ok">Se suma a la cuenta con la que ya entraste.</div>
+{% endif %}
+<form method="post" style="max-width:720px">{% csrf_token %}
+  <input type="hidden" name="rol" value="cliente">
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  {{ form.as_p }}
+  <p class="muted">Al crear la cuenta aceptas los <a href="{% url 'pagina_legal' 'terminos' %}">términos</a>.</p>
+  <button class="btn" type="submit">Guardar y comprar</button>
+</form>
+<p class="muted"><a href="{% url 'registro_cuenta' %}">Elegir otro rol</a> · <a href="{% url 'entrar_cuenta' %}">Entrar</a></p>
+{% endblock %}

@@ -25,7 +25,7 @@
       {% for c in coberturas %}{{ c.municipio }}{% if not forloop.last %}, {% endif %}{% empty %}{{ oferente.ciudad }}{% endfor %}
     </p>
     <p class="meta">{{ oferente.visitas|intcomma }} visitas
-      {% if oferente.nota %} · {{ oferente.nota|floatformat:1 }} de 5 · {{ oferente.opiniones }} comentario{{ oferente.opiniones|pluralize }}{% endif %}
+      {% if oferente.nota %} · <strong>{{ oferente.nota|floatformat:1 }} de 5</strong> · {{ oferente.opiniones }} comentario{{ oferente.opiniones|pluralize }}{% else %} · Sin calificaciones todavía{% endif %}
     </p>
     <p class="note">Pagas la cita por Wompi. El oferente recibe el restante <strong>cuando marques el trabajo como realizado</strong>.</p>
     {% if oferente.descripcion %}{{ oferente.descripcion|linebreaks }}{% endif %}
@@ -113,13 +113,18 @@
   {% endif %}
 {% endif %}
 
-{% if oferente.comentarios.all %}
-  <h3>Calificaciones</h3>
-  {% for c in oferente.comentarios.all %}
-    <article class="burbuja">
-      <p><strong>{{ c.nombre }}</strong> · {{ c.estrellas }} de 5</p>
-      {% if c.texto %}<p>{{ c.texto }}</p>{% endif %}
-    </article>
-  {% endfor %}
+<h3>Calificaciones</h3>
+{% if oferente.nota %}
+  <p class="price">{{ oferente.nota|floatformat:1 }} de 5 <span class="meta">· {{ oferente.opiniones }} comentario{{ oferente.opiniones|pluralize }}</span></p>
+{% else %}
+  <p class="muted">Todavía no hay promedio. El primero que contrate y califique deja la nota pública.</p>
 {% endif %}
+{% for c in oferente.comentarios.all %}
+  <article class="burbuja">
+    <p><strong>{{ c.nombre }}</strong> · {{ c.estrellas }} de 5 · {{ c.creado|date:"d/m/Y" }}</p>
+    {% if c.texto %}<p>{{ c.texto }}</p>{% else %}<p class="muted">Sin comentario escrito.</p>{% endif %}
+  </article>
+{% empty %}
+  <p class="note">Aún no hay comentarios de clientes.</p>
+{% endfor %}
 {% endblock %}

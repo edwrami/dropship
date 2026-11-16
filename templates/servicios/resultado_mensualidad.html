@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Mensualidad{% endblock %}
+{% block content %}
+{% if pagado %}
+  <h2>Ya apareces en servicios</h2>
+  <p>La mensualidad quedó paga hasta {{ oferente.mensualidad_hasta|date:"d/m/Y" }}.</p>
+  <p><a class="btn" href="{% url 'mi_panel' %}">Ir al panel</a>
+  <a class="btn sec" href="{% url 'detalle_oferente' oferente.slug %}">Ver tu página</a></p>
+{% else %}
+  <h2>La mensualidad aún no está confirmada</h2>
+  <p class="note">Si ya pagaste, espera y recarga. Si no, vuelve a Wompi.</p>
+  <p><a class="btn" href="{% url 'mensualidad_oferente' %}">Intentar de nuevo</a></p>
+{% endif %}
+{% endblock %}

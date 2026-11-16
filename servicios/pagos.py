@@ -1,18 +1,104 @@
-import re
 import time
 from decimal import Decimal
 
-import requests
 from django.conf import settings
 from pedidos.services import giros as giros_base
 from pedidos.services import wompi
 from vendedores.services import porcentajes_comision, peso, tarifa_wompi
 
-from .models import Cita, Cobertura, Especialidad, GiroCita, PagoActivacion, PagoCita, PagoExtra
+from datetime import timedelta
+
+from django.utils import timezone
+
+from django.core.exceptions import ObjectDoesNotExist
+
+from .models import (
+    Cita, Cobertura, Comentario, Especialidad, GiroCita,
+    PagoActivacion, PagoCita, PagoExtra, PagoMensualidad,
+)
 
 
 def cuota_activacion():
     return Decimal(str(getattr(settings, "CUOTA_SERVICIO_COP", 100000)))
+
+
+def cuota_mensualidad():
+    return Decimal(str(getattr(settings, "MENSUALIDAD_SERVICIO_COP", 50000)))
+
+
+def cuota_primera():
+    """Inscripción de $100.000: incluye el primer mes de visibilidad."""
+    return cuota_activacion()
+
+
+def abrir_cobro_inscripcion(oferente):
+    """Un solo Wompi de $100.000: inscripción + primer mes. Los meses siguientes salen a $50.000."""
+    if oferente is None:
+        return None
+    cobro, _creado = PagoActivacion.objects.get_or_create(
+        oferente=oferente,
+        defaults={
+            "monto_cop": cuota_primera(),
+            "referencia_pago": nueva_referencia("ACT", oferente.id),
+        },
+    )
+    if cobro.estado_pago != "aprobado" and cobro.monto_cop != cuota_primera():
+        cobro.monto_cop = cuota_primera()
+        cobro.referencia_pago = nueva_referencia("ACT", oferente.id)
+        cobro.estado_pago = "pendiente"
+        cobro.save(update_fields=["monto_cop", "referencia_pago", "estado_pago"])
+    return cobro
+
+
+def abrir_cobro_mensual(oferente):
+    """Crea solo el cobro del mes cuando toca. El oferente paga en Wompi; si no paga, deja de aparecer."""
+    if oferente is None:
+        return None
+    act = getattr(oferente, "activacion", None)
+    inscrito = act is not None and act.estado_pago == "aprobado"
+    if not inscrito and oferente.estado not in ("activo", "pendiente_mensualidad"):
+        return None
+    ahora = timezone.now()
+    if inscrito and not oferente.mensualidad_al_dia and oferente.estado == "activo":
+        oferente.estado = "pendiente_mensualidad"
+        oferente.save(update_fields=["estado"])
+    limite = ahora + timedelta(days=5)
+    if oferente.mensualidad_hasta and oferente.mensualidad_hasta > limite:
+        return None
+    cobro = (
+        PagoMensualidad.objects.filter(oferente=oferente, estado_pago="pendiente")
+        .order_by("-id")
+        .first()
+    )
+    if cobro:
+        return cobro
+    cobro = PagoMensualidad.objects.create(
+        oferente=oferente,
+        monto_cop=cuota_mensualidad(),
+        referencia_pago=nueva_referencia("MEN", oferente.id),
+    )
+    if oferente.user_id:
+        from pedidos.avisos import dejar_aviso
+
+        dejar_aviso(
+            [oferente.user],
+            "Mensualidad de oferente",
+            "ERA shop te abrió el cobro de $50.000 para seguir apareciendo este mes.",
+            "/servicios/mensualidad/",
+        )
+    return cobro
+
+
+def extender_mensualidad(oferente):
+    ahora = timezone.now()
+    base = oferente.mensualidad_hasta if oferente.mensualidad_hasta and oferente.mensualidad_hasta > ahora else ahora
+    oferente.mensualidad_hasta = base + timedelta(days=30)
+    act = getattr(oferente, "activacion", None)
+    inscrito = act is not None and act.estado_pago == "aprobado"
+    if inscrito or oferente.estado in ("activo", "pendiente_mensualidad"):
+        oferente.estado = "activo"
+    oferente.save(update_fields=["mensualidad_hasta", "estado"])
+    return oferente.mensualidad_hasta
 
 
 def nueva_referencia(prefijo, pk):
@@ -51,6 +137,10 @@ def aplicar_transaccion(tx):
     if extra:
         _activar_extra(extra, tx)
         return True
+    mensual = PagoMensualidad.objects.filter(referencia_pago=ref).select_related("oferente").first()
+    if mensual:
+        _cobrar_mensualidad(mensual, tx)
+        return True
     cita = Cita.objects.filter(referencia_pago=ref).select_related("oferente").first()
     if cita:
         _cobrar_cita(cita, tx)
@@ -67,12 +157,13 @@ def _activar(cobro, tx):
     cobro.wompi_id = tx.get("id") or cobro.wompi_id
     cobro.metodo_pago = tx.get("payment_method_type") or cobro.metodo_pago
     if status == "APPROVED":
+        ya = cobro.estado_pago == "aprobado"
         cobro.estado_pago = "aprobado"
         cobro.save()
+        if ya:
+            return
         oferente = cobro.oferente
-        if oferente.estado == "pendiente_pago":
-            oferente.estado = "activo"
-            oferente.save(update_fields=["estado"])
+        extender_mensualidad(oferente)
         _sembrar_incluido(oferente)
     elif status in ("DECLINED", "VOIDED"):
         cobro.estado_pago = "declinado"
@@ -109,6 +200,29 @@ def _cobrar_cita(cita, tx):
         cita.estado_pago = "reportado"
         cita.save()
         _registrar_pago(cita, "reportado")
+
+
+def _cobrar_mensualidad(cobro, tx):
+    status = _estado_wompi(tx)
+    cobro.wompi_id = tx.get("id") or cobro.wompi_id
+    cobro.metodo_pago = tx.get("payment_method_type") or cobro.metodo_pago
+    if status == "APPROVED":
+        if cobro.estado_pago == "aprobado":
+            cobro.save()
+            return
+        cobro.estado_pago = "aprobado"
+        hasta = extender_mensualidad(cobro.oferente)
+        cobro.cubre_hasta = hasta
+        cobro.save()
+    elif status in ("DECLINED", "VOIDED"):
+        cobro.estado_pago = "declinado"
+        cobro.save()
+    elif status == "ERROR":
+        cobro.estado_pago = "error"
+        cobro.save()
+    elif cobro.estado_pago != "aprobado":
+        cobro.estado_pago = "reportado"
+        cobro.save()
 
 
 def _activar_extra(cobro, tx):
@@ -165,8 +279,22 @@ def _sembrar_incluido(oferente):
         esp.save(update_fields=["incluida", "activa"])
 
 
+def cita_lista_para_giro(cita):
+    if cita is None or cita.estado_pago != "aprobado" or not cita.trabajo_realizado:
+        return False
+    try:
+        return cita.comentario is not None
+    except (ObjectDoesNotExist, Comentario.DoesNotExist):
+        return False
+
+
 def liberar_giro_si_realizado(cita):
-    if cita.estado_pago != "aprobado" or not cita.trabajo_realizado:
+    return intentar_giro_servicio(cita)
+
+
+def intentar_giro_servicio(cita):
+    """Anota el restante. El dinero se queda en Wompi hasta que ERA shop autorice el giro."""
+    if not cita_lista_para_giro(cita):
         return None
     cita.estado = "realizado"
     cita.estado_comision = "retenida"
@@ -195,8 +323,30 @@ def _registrar_pago(cita, estado):
     pago.save()
 
 
+def _avisar_consignar_servicio(cita, giro, creado):
+    if not creado:
+        return
+    from django.contrib.auth.models import User
+    from pedidos.avisos import dejar_aviso
+
+    staff = list(User.objects.filter(is_staff=True, is_active=True)[:30])
+    if not staff:
+        return
+    dejar_aviso(
+        staff,
+        f"Consignar oficio · Nequi {giro.destino_nequi or 'sin número'}",
+        (
+            f"{cita.oferente.nombre} ({cita.oferente.responsable}). "
+            f"Cliente {cita.cliente_nombre} pagó ${cita.monto_cop}. "
+            f"Comisión ERA shop ${cita.comision_cop}. Tarifa Wompi ${cita.tarifa_pasarela_cop}. "
+            f"Transferir ${giro.monto_cop} al Nequi {giro.destino_nequi or 'sin número'}."
+        ),
+        "/servicios/admin-era/consignar/",
+    )
+
+
 def repartir_cita(cita):
-    giro, _creado = GiroCita.objects.get_or_create(
+    giro, creado = GiroCita.objects.get_or_create(
         cita=cita,
         defaults={
             "monto_cop": cita.neto_vendedor or 0,
@@ -204,81 +354,26 @@ def repartir_cita(cita):
             "destino_nequi": (cita.oferente.nequi or "")[:20],
         },
     )
-    if giro.estado == "pagado":
+    if giro.estado in ("pagado", "enviado"):
+        if creado:
+            _avisar_consignar_servicio(cita, giro, creado)
         return giro
     giro.monto_cop = cita.neto_vendedor or 0
     giro.comision_cop = cita.comision_cop or 0
     giro.destino_nequi = (cita.oferente.nequi or "")[:20]
-    oferente = cita.oferente
-    if giro.payout_id:
-        giro.estado = "enviado"
-        giro.save()
-        return giro
-    nequi = re.sub(r"\D", "", giro.destino_nequi or "")
-    documento = re.sub(r"\D", "", oferente.documento or "")
-    email = ""
-    if oferente.user_id:
-        email = (oferente.user.email or "").strip()
-    email = email or (oferente.email or "").strip()
-    if len(nequi) != 10 or not documento or not email or not (oferente.responsable or "").strip():
-        giro.estado = "sin_datos"
-        giro.detalle = "El oferente debe tener Nequi, cédula, nombre y correo."
-        giro.save()
-        return giro
-    if int(giro.monto_cop or 0) <= 0:
-        giro.estado = "rechazado"
-        giro.detalle = "El valor para el oferente es cero."
-        giro.save()
-        return giro
-    cuenta = giros_base._cuenta()
-    if not giros_base._llaves(cuenta):
+    if not giro.payout_id:
         giro.estado = "pendiente"
-        giro.detalle = "El restante queda anotado. ERA shop lo consigna a mano al Nequi del oferente."
+        giro.detalle = "El dinero sigue en Wompi. ERA shop autoriza el giro al Nequi del oferente."
         giro.save()
+    _avisar_consignar_servicio(cita, giro, creado)
+    return giro
+
+
+def autorizar_giro_cita(cita):
+    giro = GiroCita.objects.filter(cita=cita).first() or intentar_giro_servicio(cita)
+    if giro is None or giro.estado in ("pagado", "enviado"):
         return giro
-    banco = giros_base._banco_nequi(cuenta)
-    origen = cuenta.payouts_account_id or giros_base._cuenta_origen(cuenta)
-    if not banco or not origen:
-        giro.estado = "pendiente"
-        giro.detalle = "Wompi aún no muestra la cuenta de origen o el banco Nequi."
-        giro.save()
-        return giro
-    cuerpo = {
-        "reference": f"giro-srv-{cita.id}",
-        "accountId": origen,
-        "paymentType": "OTHER",
-        "transactions": [{
-            "legalIdType": "NIT" if len(documento) > 10 else "CC",
-            "legalId": documento[:20],
-            "bankId": banco,
-            "accountType": "AHORROS",
-            "accountNumber": nequi,
-            "name": oferente.responsable[:80],
-            "email": email[:120],
-            "amount": int(giro.monto_cop) * 100,
-            "reference": f"giro-srv-{cita.id}",
-        }],
-    }
-    try:
-        respuesta = requests.post(
-            f"{giros_base.BASE}/payouts",
-            headers=giros_base._headers(cuenta, f"giro-srv-{cita.id}"),
-            json=cuerpo,
-            timeout=20,
-        )
-    except requests.RequestException:
-        giro.estado = "pendiente"
-        giro.detalle = "No se pudo ordenar el giro. Quedó pendiente."
-        giro.save()
-        return giro
-    if respuesta.status_code >= 400:
-        giro.estado = "pendiente"
-        giro.detalle = giros_base._mensaje_error(respuesta)[:300]
-        giro.save()
-        return giro
-    data = respuesta.json() if respuesta.content else {}
-    giro.payout_id = str(giros_base._buscar(data, "payoutId") or giros_base._buscar(data, "id") or "")[:80]
-    giro.estado = "enviado"
-    giro.detalle = "Wompi está procesando el giro al Nequi del oferente."
-    giro.save()
+    giro.monto_cop = cita.neto_vendedor or giro.monto_cop
+    giro.destino_nequi = (cita.oferente.nequi or giro.destino_nequi or "")[:20]
+    giros_base._enviar(giro, cita.oferente, f"giro-srv-{cita.id}")
     return giro

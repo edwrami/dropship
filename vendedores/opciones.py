@@ -9,7 +9,7 @@ DEPARTAMENTOS = [
 
 DEPARTAMENTOS_CHOICES = [("", "Selecciona")] + [(d, d) for d in DEPARTAMENTOS]
 
-TIPOS_PROVEEDOR = ("fabricante", "mayorista", "importador")
+TIPOS_PROVEEDOR = ("fabricante", "mayorista", "importador", "distribuidor")
 
 TIPOS = [
     ("persona", "Persona"),
@@ -22,6 +22,21 @@ TIPOS = [
     ("distribuidor", "Distribuidor"),
     ("dropshipper", "Dropshipper"),
     ("outlet", "Outlet"),
+]
+
+TIPOS_DETAL = [
+    ("persona", "Persona"),
+    ("virtual", "Tienda virtual"),
+    ("empresa", "Tienda física"),
+    ("detallista", "Detallista"),
+    ("dropshipper", "Dropshipper"),
+    ("outlet", "Outlet"),
+]
+TIPOS_MAYOR = [
+    ("fabricante", "Fabricante"),
+    ("mayorista", "Mayorista"),
+    ("importador", "Importador"),
+    ("distribuidor", "Distribuidor"),
 ]
 
 RANGOS = [

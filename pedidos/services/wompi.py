@@ -28,6 +28,11 @@ def claves_wompi():
     return publica or "", integridad or "", eventos or ""
 
 
+def llave_privada():
+    cuenta = _cuenta()
+    return (cuenta.wompi_privada if cuenta and cuenta.wompi_privada else "") or ""
+
+
 def firma_integridad(referencia, amount_in_cents, currency="COP"):
     secreto = claves_wompi()[1]
     raw = f"{referencia}{amount_in_cents}{currency}{secreto}"
@@ -56,15 +61,17 @@ def contexto_widget(pedido, redirect_url):
 
 def consultar_transaccion(tx_id, public_key):
     """Lee en Wompi una transacción creada desde esta página."""
-    if not tx_id or not public_key:
+    token = llave_privada() or public_key
+    if not tx_id or not token:
         return None
     import requests
 
-    base = "https://sandbox.wompi.co" if str(public_key).startswith("pub_test_") else "https://production.wompi.co"
+    prueba = str(token).startswith("pub_test_") or str(token).startswith("prv_test_") or str(public_key or "").startswith("pub_test_")
+    base = "https://sandbox.wompi.co" if prueba else "https://production.wompi.co"
     try:
         respuesta = requests.get(
             f"{base}/v1/transactions/{tx_id}",
-            headers={"Authorization": f"Bearer {public_key}"},
+            headers={"Authorization": f"Bearer {token}"},
             timeout=12,
         )
     except requests.RequestException:

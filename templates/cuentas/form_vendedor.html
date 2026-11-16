@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{% if rol == "mayorista" %}Registro mayorista{% else %}Registro al detal{% endif %} · ERA shop{% endblock %}
+{% block content %}
+{% if rol == "mayorista" %}
+  <p class="eyebrow">Mayorista</p>
+  <h2>Vender al por mayor</h2>
+  <p class="muted">Fabricante, mayorista, importador o distribuidor. Publicas lista de mayor y también vendes al detal. Con este correo puedes comprar.</p>
+{% else %}
+  <p class="eyebrow">Vendedor al detal</p>
+  <h2>Vender en el catálogo</h2>
+  <p class="muted">El cliente paga por Wompi. ERA shop descuenta su porcentaje y la tarifa de la pasarela. El resto llega a tu Nequi una sola vez, cuando el pago queda aprobado. Con este correo también compras.</p>
+{% endif %}
+{% if logueado %}
+  <div class="ok">Se suma a la cuenta con la que ya entraste. No se crea otro correo.</div>
+{% endif %}
+{% include "vendedores/_descuento.html" %}
+<form method="post">{% csrf_token %}
+  <input type="hidden" name="rol" value="{{ rol }}">
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  {{ form.as_p }}
+  {% include "vendedores/_categorias.html" %}
+  <p class="muted">Al crear la cuenta aceptas los <a href="{% url 'pagina_legal' 'terminos' %}">términos</a>.</p>
+  <button class="btn" type="submit">Crear la tienda</button>
+</form>
+<p class="muted"><a href="{% url 'registro_cuenta' %}">Elegir otro rol</a> · <a href="{% url 'entrar_cuenta' %}">Entrar</a></p>
+{% endblock %}

@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Cuota de oferente{% endblock %}
 {% block content %}
-{% if pagado %}
+{% if pagado and falta_mensualidad %}
+  <h2>Inscripción paga</h2>
+  <p>Este cobro era solo la inscripción. Paga la mensualidad de ${{ mensualidad|floatformat:0|intcomma }} para aparecer.</p>
+  <p><a class="btn" href="{% url 'mensualidad_oferente' %}">Pagar mensualidad</a></p>
+{% elif pagado %}
   <h2>Ya apareces en servicios</h2>
-  <p>La cuota quedó pagada. Completa fotos y agenda para que la gente te reserve.</p>
-  <p><a class="btn" href="{% url 'panel_oferente' %}">Ir al panel</a>
+  <p>Quedaron pagas la inscripción y el mes en curso. Completa fotos y agenda para que la gente te reserve.</p>
+  <p><a class="btn" href="{% url 'mi_panel' %}">Ir al panel</a>
   <a class="btn sec" href="{% url 'detalle_oferente' oferente.slug %}">Ver tu página</a></p>
 {% else %}
   <h2>La cuota aún no está confirmada</h2>

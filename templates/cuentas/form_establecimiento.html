@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Compra al por mayor · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Establecimiento</p>
+<h2>Comprar al por mayor</h2>
+<p class="muted">Para ver listas de fabricantes y mayoristas. Si ya tienes correo de cliente o de vendedor, entra con esa contraseña: no se crea otra cuenta.</p>
+{% if logueado %}
+  <div class="ok">Se suma a este correo.</div>
+{% endif %}
+<form method="post" style="max-width:720px">{% csrf_token %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  {{ form.as_p }}
+  <button class="btn" type="submit">Guardar establecimiento</button>
+</form>
+<p class="muted"><a href="{% url 'registro_cuenta' %}">Elegir otro rol</a> · <a href="{% url 'entrar_cuenta' %}">Entrar</a></p>
+{% endblock %}

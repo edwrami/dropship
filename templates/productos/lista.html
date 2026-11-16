@@ -5,9 +5,10 @@
   <div>
     <p class="eyebrow">Marketplace</p>
     <h1>ERA shop</h1>
-    <p class="lede">Compra en el catálogo, compra al por mayor o publica. Persona, tienda física, tienda virtual, fabricante, mayorista e importador entran por el enlace que les corresponde. El fabricante, el mayorista y el importador también venden al detal.</p>
+    <p class="lede">Una cuenta. En el registro dices si eres cliente, vendedor al detal o mayorista. Después puedes comprar y vender con el mismo correo. El contacto sale cuando el pago queda aprobado, una sola vez.</p>
     <p>
-      <a class="btn" href="{% url 'publicar_producto' %}">Publicar producto</a>
+      <a class="btn" href="{% url 'registro_cuenta' %}">Registrarme</a>
+      <a class="btn sec" href="{% url 'publicar_producto' %}">Publicar producto</a>
       <a class="btn sec" href="{% url 'lista_servicios' %}">Servicios</a>
       <a class="btn sec" href="{% url 'vender_mayor' %}">Vender al por mayor</a>
       <a class="btn sec" href="{% url 'proveedores_mayor' %}">Comprar al por mayor</a>

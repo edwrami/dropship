@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Mensualidad de oferente{% endblock %}
+{% block content %}
+<p class="eyebrow">Mensualidad</p>
+<h2>${{ cuota|floatformat:0|intcomma }} COP</h2>
+<p>Con este pago apareces 30 días. Si ya tenías días pagados, se suman. Sin mensualidad al día no sales en el listado. Las citas siguen pagando comisión.</p>
+{% if oferente.mensualidad_hasta %}
+  <p class="meta">Tu cobertura actual va hasta {{ oferente.mensualidad_hasta|date:"d/m/Y" }}.</p>
+{% endif %}
+<p>Referencia <strong>{{ cobro.referencia_pago }}</strong>.</p>
+{% include "servicios/_wompi.html" %}
+<p><a class="btn sec" href="{% url 'mi_panel' %}">Volver al panel</a></p>
+{% endblock %}

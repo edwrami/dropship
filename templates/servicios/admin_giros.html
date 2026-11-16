@@ -4,7 +4,7 @@
 {% block content %}
 <p class="eyebrow">Administración</p>
 <h1>Consignar al Nequi</h1>
-<p class="lede">Cuando el cliente marca el servicio como hecho, entra aquí el Nequi del oferente y lo que hay que consignarle.</p>
+<p class="lede">Cuando el cliente marca el servicio como hecho y lo califica, entra aquí el Nequi del oferente y lo que hay que consignarle, ya con comisión y tarifa Wompi descontadas. El cliente pagó a la cuenta Wompi de ERA shop. Si conectaste Payouts, Wompi puede girar a ese Nequi; si no, consignas a mano con esta lista.</p>
 <p><a href="{% url 'admin_servicios' %}">Volver</a></p>
 {% if not filas %}
   <p class="note">Aún no hay trabajos marcados como realizados.</p>
@@ -18,12 +18,17 @@
           <p class="meta">{{ fila.cita.oferente.oficio_texto }} · {{ fila.cita.cliente_nombre }}</p>
           <p class="price">Consignar ${{ fila.monto|floatformat:0|intcomma }}</p>
           <p><strong>Nequi {{ fila.nequi }}</strong></p>
+          <p class="meta">Cliente pagó ${{ fila.pagado_cliente|floatformat:0|intcomma }} · comisión ${{ fila.comision|floatformat:0|intcomma }} · Wompi ${{ fila.tarifa|floatformat:0|intcomma }}{% if fila.nota %} · {{ fila.nota }} de 5{% endif %}</p>
           <p class="meta">Estado: {{ fila.estado }}{% if fila.giro and fila.giro.detalle %} · {{ fila.giro.detalle }}{% endif %}</p>
           {% if not fila.consignado %}
+            <form method="post" action="{% url 'admin_autorizar_wompi' fila.cita.id %}">
+              {% csrf_token %}
+              <p><button class="btn" type="submit">Autorizar giro Wompi a este Nequi</button></p>
+            </form>
             <form method="post" action="{% url 'admin_marcar_consignado' fila.cita.id %}">
               {% csrf_token %}
-              <label>Comprobante<input name="comprobante" placeholder="Número o nota del giro"></label>
-              <p><button class="btn" type="submit">Marcar consignado</button></p>
+              <label>Si ya lo consignaste a mano<input name="comprobante" placeholder="Número o nota del giro"></label>
+              <p><button class="btn sec" type="submit">Marcar consignado a mano</button></p>
             </form>
           {% else %}
             <p class="pill ok-pill">Ya consignado</p>

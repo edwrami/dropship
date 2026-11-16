@@ -5,7 +5,7 @@ from django.utils import timezone
 from productos.models import Producto
 
 from .models import Categoria, ClienteTienda, Comprador
-from .opciones import CONDICIONES, DEPARTAMENTOS_CHOICES, RANGOS, TIPOS
+from .opciones import CONDICIONES, DEPARTAMENTOS_CHOICES, RANGOS, TIPOS, TIPOS_DETAL, TIPOS_MAYOR
 
 
 def _telefono_valido(valor):
@@ -34,7 +34,7 @@ class RegistroForm(forms.Form):
     documento = forms.CharField(label="Cédula o NIT", max_length=40)
     email = forms.EmailField(label="Correo")
     password = forms.CharField(label="Contraseña", min_length=8, widget=forms.PasswordInput)
-    password2 = forms.CharField(label="Repite la contraseña", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Repite la contraseña", widget=forms.PasswordInput, required=False)
     telefono = forms.CharField(label="Teléfono", max_length=50)
     whatsapp = forms.CharField(label="WhatsApp", max_length=50)
     nequi = forms.CharField(
@@ -63,10 +63,30 @@ class RegistroForm(forms.Form):
         label="Acepto que de cada venta se descuentan el porcentaje vigente de ERA shop y la tarifa de Wompi, y que yo recibo el resto en mi Nequi",
     )
 
+    def __init__(self, *args, usuario=None, modo="detal", **kwargs):
+        self.usuario = usuario
+        self.modo = modo
+        super().__init__(*args, **kwargs)
+        if modo == "mayorista":
+            self.fields["tipo"].choices = TIPOS_MAYOR
+            self.fields["tipo"].label = "Tipo de proveedor"
+            self.fields["tipo"].help_text = "Fabricante, mayorista, importador o distribuidor. También vendes al detal."
+        else:
+            self.fields["tipo"].choices = TIPOS_DETAL
+            self.fields["tipo"].label = "Cómo vendes al detal"
+            self.fields["tipo"].help_text = "Persona o tienda. Con el mismo correo también puedes comprar."
+        if usuario and getattr(usuario, "is_authenticated", False):
+            self.fields["email"].initial = usuario.email or usuario.username
+            self.fields["email"].widget.attrs["readonly"] = True
+            self.fields["password"].required = False
+            self.fields["password2"].required = False
+            self.fields["password"].help_text = "Déjala vacía: ya estás dentro de esta cuenta."
+            self.fields["password2"].help_text = "No hace falta repetirla."
+
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
-        if User.objects.filter(username=email).exists():
-            raise forms.ValidationError("Ese correo ya está registrado.")
+        if self.usuario and getattr(self.usuario, "is_authenticated", False):
+            return (self.usuario.email or self.usuario.username).strip().lower()
         return email
 
     def clean_nombre_tienda(self):
@@ -93,6 +113,13 @@ class RegistroForm(forms.Form):
 
     def clean(self):
         data = super().clean()
+        email = data.get("email")
+        if self.usuario and getattr(self.usuario, "is_authenticated", False):
+            return data
+        if email and User.objects.filter(username=email).exists():
+            if not data.get("password"):
+                self.add_error("password", "Escribe la contraseña de esa cuenta para vender con el mismo correo.")
+            return data
         if data.get("password") and data.get("password2") and data["password"] != data["password2"]:
             self.add_error("password2", "Las contraseñas no coinciden.")
         return data
@@ -317,7 +344,7 @@ class RegistroClienteForm(forms.Form):
     documento = forms.CharField(label="Cédula o NIT", max_length=40)
     email = forms.EmailField(label="Correo")
     password = forms.CharField(label="Contraseña", min_length=8, widget=forms.PasswordInput)
-    password2 = forms.CharField(label="Repite la contraseña", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Repite la contraseña", widget=forms.PasswordInput, required=False)
     telefono = forms.CharField(label="Teléfono", max_length=50)
     direccion = forms.CharField(label="Dirección de entrega", widget=forms.Textarea(attrs={"rows": 2}))
     barrio = forms.CharField(label="Barrio", max_length=120, required=False)
@@ -328,11 +355,19 @@ class RegistroClienteForm(forms.Form):
         label="Acepto los términos, las devoluciones y el tratamiento de datos",
     )
 
+    def __init__(self, *args, usuario=None, **kwargs):
+        self.usuario = usuario
+        super().__init__(*args, **kwargs)
+        if usuario and getattr(usuario, "is_authenticated", False):
+            self.fields["email"].initial = usuario.email or usuario.username
+            self.fields["email"].widget.attrs["readonly"] = True
+            self.fields["password"].required = False
+            self.fields["password2"].required = False
+
     def clean_email(self):
-        email = self.cleaned_data["email"].strip().lower()
-        if User.objects.filter(username=email).exists():
-            raise forms.ValidationError("Ese correo ya está registrado.")
-        return email
+        if self.usuario and getattr(self.usuario, "is_authenticated", False):
+            return (self.usuario.email or self.usuario.username).strip().lower()
+        return self.cleaned_data["email"].strip().lower()
 
     def clean_telefono(self):
         return _telefono_valido(self.cleaned_data["telefono"])
@@ -351,6 +386,13 @@ class RegistroClienteForm(forms.Form):
 
     def clean(self):
         data = super().clean()
+        email = data.get("email")
+        if self.usuario and getattr(self.usuario, "is_authenticated", False):
+            return data
+        if email and User.objects.filter(username=email).exists():
+            if not data.get("password"):
+                self.add_error("password", "Escribe la contraseña de esa cuenta para añadir la compra al por mayor.")
+            return data
         if data.get("password") and data.get("password2") and data["password"] != data["password2"]:
             self.add_error("password2", "Las contraseñas no coinciden.")
         return data
@@ -391,7 +433,7 @@ class RegistroCompradorForm(forms.Form):
     documento = forms.CharField(label="Cédula", max_length=40)
     email = forms.EmailField(label="Correo")
     password = forms.CharField(label="Contraseña", min_length=8, widget=forms.PasswordInput)
-    password2 = forms.CharField(label="Repite la contraseña", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Repite la contraseña", widget=forms.PasswordInput, required=False)
     telefono = forms.CharField(label="Teléfono", max_length=50)
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
     barrio = forms.CharField(label="Barrio", max_length=120, required=False)
@@ -401,12 +443,29 @@ class RegistroCompradorForm(forms.Form):
     acepta = forms.BooleanField(
         label="Acepto los términos, las devoluciones y el tratamiento de datos",
     )
+    compra_mayor = forms.BooleanField(
+        label="Mi establecimiento también compra al por mayor (fabricantes y mayoristas)",
+        required=False,
+    )
+    nombre_tienda = forms.CharField(
+        label="Nombre del establecimiento (si compras al por mayor)",
+        max_length=160,
+        required=False,
+    )
+
+    def __init__(self, *args, usuario=None, **kwargs):
+        self.usuario = usuario
+        super().__init__(*args, **kwargs)
+        if usuario and getattr(usuario, "is_authenticated", False):
+            self.fields["email"].initial = usuario.email or usuario.username
+            self.fields["email"].widget.attrs["readonly"] = True
+            self.fields["password"].required = False
+            self.fields["password2"].required = False
 
     def clean_email(self):
-        email = self.cleaned_data["email"].strip().lower()
-        if User.objects.filter(username=email).exists():
-            raise forms.ValidationError("Ese correo ya está registrado.")
-        return email
+        if self.usuario and getattr(self.usuario, "is_authenticated", False):
+            return (self.usuario.email or self.usuario.username).strip().lower()
+        return self.cleaned_data["email"].strip().lower()
 
     def clean_telefono(self):
         return _telefono_valido(self.cleaned_data["telefono"])
@@ -425,6 +484,15 @@ class RegistroCompradorForm(forms.Form):
 
     def clean(self):
         data = super().clean()
+        email = data.get("email")
+        if data.get("compra_mayor") and not (data.get("nombre_tienda") or "").strip():
+            self.add_error("nombre_tienda", "Escribe el nombre del establecimiento.")
+        if self.usuario and getattr(self.usuario, "is_authenticated", False):
+            return data
+        if email and User.objects.filter(username=email).exists():
+            if not data.get("password"):
+                self.add_error("password", "Escribe la contraseña de esa cuenta para comprar con el mismo correo.")
+            return data
         if data.get("password") and data.get("password2") and data["password"] != data["password2"]:
             self.add_error("password2", "Las contraseñas no coinciden.")
         return data

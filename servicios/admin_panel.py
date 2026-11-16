@@ -1,10 +1,11 @@
 import json
-from datetime import time
+from datetime import time, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
@@ -19,12 +20,13 @@ from .models import (
     GiroCita,
     Horario,
     Oferente,
+    PagoActivacion,
     OficioCatalogo,
     RubroCatalogo,
 )
 from .municipios import MUNICIPIOS
 from .oficios import MODOS_TIEMPO, UNIDADES
-from .pagos import cuota_activacion
+from .pagos import autorizar_giro_cita, cuota_activacion, nueva_referencia
 
 
 def _staff(request):
@@ -53,9 +55,9 @@ def consignaciones(request):
     if bloqueo:
         return bloqueo
     hechos = (
-        Cita.objects.filter(trabajo_realizado=True, estado_pago="aprobado")
-        .select_related("oferente", "especialidad")
-        .order_by("-realizado_en", "-id")
+        Cita.objects.filter(trabajo_realizado=True, estado_pago="aprobado", comentario__isnull=False)
+        .select_related("oferente", "especialidad", "giro", "comentario")
+        .order_by("-realizado_en", "-id")[:200]
     )
     filas = []
     for cita in hechos:
@@ -67,9 +69,13 @@ def consignaciones(request):
             "cita": cita,
             "giro": giro,
             "nequi": (giro.destino_nequi if giro and giro.destino_nequi else cita.oferente.nequi) or "Sin Nequi",
+            "pagado_cliente": cita.monto_cop,
+            "comision": cita.comision_cop,
+            "tarifa": cita.tarifa_pasarela_cop,
             "monto": (giro.monto_cop if giro else cita.neto_vendedor) or 0,
             "estado": giro.estado if giro else "pendiente",
             "consignado": giro.estado == "pagado" if giro else False,
+            "nota": cita.comentario.estrellas,
         })
     return render(request, "servicios/admin_giros.html", {"filas": filas})
 
@@ -88,15 +94,35 @@ def marcar_consignado(request, cita_id):
             "destino_nequi": (cita.oferente.nequi or "")[:20],
         },
     )
+    if giro.estado == "pagado":
+        messages.info(request, "Ese giro ya estaba consignado.")
+        return redirect("admin_consignaciones")
     giro.monto_cop = cita.neto_vendedor or 0
     giro.comision_cop = cita.comision_cop or 0
     giro.destino_nequi = (cita.oferente.nequi or "")[:20]
+    if giro.estado == "enviado":
+        messages.error(request, "Ese giro ya salió por Wompi. No lo marques otra vez.")
+        return redirect("admin_consignaciones")
     giro.estado = "pagado"
     giro.detalle = (request.POST.get("comprobante") or "Consignado a mano por el administrador.")[:300]
     giro.save()
     cita.estado_comision = "pagada"
     cita.save(update_fields=["estado_comision"])
     messages.success(request, f"Quedó consignado ${giro.monto_cop} al Nequi {giro.destino_nequi}.")
+    return redirect("admin_consignaciones")
+
+
+@require_POST
+def autorizar_wompi(request, cita_id):
+    bloqueo = _staff(request)
+    if bloqueo:
+        return bloqueo
+    cita = get_object_or_404(Cita.objects.select_related("oferente"), pk=cita_id)
+    giro = autorizar_giro_cita(cita)
+    if giro is None:
+        messages.error(request, "Esa cita aún no está lista para girar.")
+    else:
+        messages.success(request, f"Giro cita #{cita.id}: {giro.get_estado_display()}. {giro.detalle}")
     return redirect("admin_consignaciones")
 
 
@@ -230,6 +256,13 @@ def oferente_nuevo(request):
                     duracion_minutos=int(data["duracion_minutos"]),
                     acepta_terminos=True,
                     estado="activo",
+                    mensualidad_hasta=timezone.now() + timedelta(days=3650),
+                )
+                PagoActivacion.objects.create(
+                    oferente=oferente,
+                    monto_cop=cuota_activacion(),
+                    referencia_pago=nueva_referencia("ACT", oferente.id),
+                    estado_pago="aprobado",
                 )
                 for dia in range(6):
                     Horario.objects.create(oferente=oferente, dia=dia, abre=time(8, 0), cierra=time(18, 0), activo=True)

@@ -3,8 +3,13 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 from django.views.static import serve
 
+from vendedores import cuentas, tablero
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("registro/", cuentas.inicio_registro, name="registro_cuenta"),
+    path("entrar/", cuentas.entrar_cuenta, name="entrar_cuenta"),
+    path("mi-panel/", tablero.mi_panel, name="mi_panel"),
     path("vendedores/", include("vendedores.urls")),
     path("clientes/", include("vendedores.clientes_urls")),
     path("", include("productos.urls")),

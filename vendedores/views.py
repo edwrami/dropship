@@ -57,74 +57,16 @@ def _destino_registro(request):
     return "/vendedores/panel/"
 
 
-@transaction.atomic
 def registro(request):
-    if _vendedor(request.user):
-        return redirect(_destino_registro(request))
-    inicial = {}
-    if request.method == "GET":
-        tipo = (request.GET.get("tipo") or "").strip()
-        if tipo in dict(TIPOS):
-            inicial["tipo"] = tipo
-    form = RegistroForm(request.POST or None, initial=inicial)
-    seleccionadas = _ids_categorias(request) if request.method == "POST" else []
-    if request.method == "POST" and form.is_valid():
-        categorias = _categorias_validas(seleccionadas)
-        if not categorias:
-            form.add_error(None, "Elige al menos una categoría de mercancía.")
-        else:
-            data = form.cleaned_data
-            user = User.objects.create_user(
-                username=data["email"],
-                email=data["email"],
-                password=data["password"],
-            )
-            vendedor = Vendedor.objects.create(
-                user=user,
-                nombre_tienda=data["nombre_tienda"],
-                responsable=data["responsable"],
-                documento=data["documento"],
-                telefono=data["telefono"],
-                whatsapp=data["whatsapp"],
-                nequi=data["nequi"],
-                direccion=data["direccion"],
-                ciudad=data["ciudad"].strip(),
-                departamento=data["departamento"],
-                tipo=data["tipo"],
-                rango_precio=data["rango_precio"],
-                acepta_terminos=True,
-            )
-            vendedor.categorias.set(categorias)
-            login(request, user)
-            messages.success(request, "Registro listo. Ahora completa el producto si vas a publicarlo.")
-            return redirect(_destino_registro(request))
-    return render(request, "vendedores/registro.html", {
-        "form": form,
-        "grupos": _grupos(),
-        "seleccionadas": seleccionadas,
-        "next": _destino_registro(request) if request.GET.get("next") or request.POST.get("next") else "",
-        "modo": (request.POST.get("modo") or request.GET.get("tipo") or "").strip(),
-        "otra_cuenta": request.user.is_authenticated,
-    })
+    from . import cuentas
+    tipo = (request.GET.get("tipo") or "").strip()
+    modo = "mayorista" if tipo in TIPOS_PROVEEDOR or tipo == "mayorista" else "detal"
+    return cuentas.registro_vendedor(request, modo=modo)
 
 
 def entrar(request):
-    if _vendedor(request.user):
-        return redirect("panel_vendedor")
-    error = ""
-    if request.method == "POST":
-        email = (request.POST.get("email") or "").strip().lower()
-        user = authenticate(request, username=email, password=request.POST.get("password") or "")
-        if user is None:
-            error = "Correo o contraseña incorrectos."
-        else:
-            login(request, user)
-            if _vendedor(user) is None:
-                logout(request)
-                error = "Esa cuenta es de una tienda compradora. Entra desde Soy tienda."
-            else:
-                return redirect("panel_vendedor")
-    return render(request, "vendedores/entrar.html", {"error": error})
+    from . import cuentas
+    return cuentas.entrar_cuenta(request)
 
 
 def salir(request):
@@ -253,9 +195,7 @@ def publicar_producto(request):
     if vendedor:
         messages.error(request, "Tu tienda fue retirada y no puede publicar.")
         return redirect("panel_vendedor")
-    if request.user.is_authenticated:
-        return render(request, "vendedores/otra_cuenta.html", {"para": "publicar"})
-    return redirect("/vendedores/registro/?next=/vendedores/producto/nuevo/")
+    return redirect("/registro/?rol=detal&next=/vendedores/producto/nuevo/")
 
 
 def vender_mayor(request):
@@ -264,16 +204,14 @@ def vender_mayor(request):
         return redirect("panel_vendedor")
     if vendedor:
         return render(request, "vendedores/vender_mayor.html", {"vendedor": vendedor})
-    if request.user.is_authenticated:
-        return render(request, "vendedores/otra_cuenta.html", {"para": "mayor"})
-    return redirect("/vendedores/registro/?tipo=mayorista&next=/vendedores/panel/")
+    return redirect("/registro/?rol=mayorista&next=/vendedores/panel/")
 
 
-@login_required(login_url="registro_vendedor")
+@login_required(login_url="entrar_cuenta")
 def producto_form(request, pk=None):
     vendedor = _vendedor(request.user)
     if vendedor is None:
-        return redirect("/vendedores/registro/?next=/vendedores/producto/nuevo/")
+        return redirect("/registro/?rol=detal&next=/vendedores/producto/nuevo/")
     if vendedor.estado != "activo":
         messages.error(request, "Tu tienda fue retirada y no puede publicar.")
         return redirect("panel_vendedor")
@@ -635,7 +573,7 @@ def _producto_desde_fila(vendedor, fila, rubros):
     }, ""
 
 
-@login_required(login_url="registro_vendedor")
+@login_required(login_url="entrar_cuenta")
 def cargar_lista(request):
     vendedor = _vendedor(request.user)
     if vendedor is None:

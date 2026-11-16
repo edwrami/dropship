@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Mi panel · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Tu cuenta</p>
+<h1>Mi panel</h1>
+<p class="lede">Aquí ves ventas, compras, oficios, pedidos, despachos y todos los pagos de este correo. Un rol no abre otra cuenta.</p>
+
+<p>
+  {% if vendedor %}<a class="btn sec" href="{% url 'panel_vendedor' %}">Gestionar tienda</a>{% else %}<a class="btn sec" href="{% url 'registro_cuenta' %}?rol=detal">Vender en el catálogo</a>{% endif %}
+  {% if oferente %}<a class="btn sec" href="{% url 'panel_oferente' %}">Gestionar oficio</a>{% else %}<a class="btn sec" href="{% url 'registro_oferente' %}">Ofrecer un oficio</a>{% endif %}
+  {% if comprador %}<a class="btn sec" href="{% url 'carrito_compra' %}">Carrito</a> <a class="btn sec" href="{% url 'datos_comprador' %}">Mis datos</a>{% endif %}
+  {% if cliente %}<a class="btn sec" href="{% url 'mis_proveedores' %}">Proveedores</a>{% endif %}
+  {% if vendedor %}<a class="btn sec" href="{% url 'liquidar_comision' %}">Liquidar comisión</a>{% endif %}
+</p>
+
+{% if es_staff %}
+  <h2>Consignar (ERA shop)</h2>
+  <p class="lede">El cliente paga a tu cuenta Wompi y el dinero se queda ahí. Tú autorizas el envío a tu Nequi o al Nequi de cada vendedor u oferente.</p>
+  <p>
+    <a class="btn" href="{% url 'tesoreria' %}">Autorizar giros Wompi</a>
+    <a class="btn sec" href="{% url 'admin_consignaciones' %}">Lista de oficios</a>
+    <a class="btn sec" href="{% url 'lista_pedidos' %}">Ventas</a>
+  </p>
+  {% if saldo_era != None %}
+    <p class="note">De ERA shop en Wompi: ${{ saldo_era|floatformat:0|intcomma }}. Eso sale a tu Nequi solo cuando lo autorices en Tesorería.</p>
+  {% endif %}
+  <table>
+    <tr><th>Origen</th><th>Quién</th><th>Nequi</th><th>Pagó el cliente</th><th>Descuentos</th><th>Consignar</th><th>Estado</th></tr>
+    {% for g in staff_oficios %}
+      <tr>
+        <td>Oficio cita #{{ g.cita_id }}</td>
+        <td>{{ g.cita.oferente.nombre }}</td>
+        <td>{{ g.destino_nequi|default:g.cita.oferente.nequi }}</td>
+        <td>${{ g.cita.monto_cop|floatformat:0|intcomma }}</td>
+        <td>Comisión ${{ g.cita.comision_cop|floatformat:0|intcomma }} · Wompi ${{ g.cita.tarifa_pasarela_cop|floatformat:0|intcomma }}</td>
+        <td><strong>${{ g.monto_cop|floatformat:0|intcomma }}</strong></td>
+        <td>{{ g.get_estado_display }}</td>
+      </tr>
+    {% endfor %}
+    {% for g in staff_giros %}
+      <tr>
+        <td>Pedido #{{ g.pedido_id }}</td>
+        <td>{% if g.pedido.vendedor %}{{ g.pedido.vendedor.nombre_tienda }}{% else %}—{% endif %}</td>
+        <td>{{ g.destino_nequi }}</td>
+        <td>${{ g.pedido.monto_cop|floatformat:0|intcomma }}</td>
+        <td>Comisión ${{ g.pedido.comision_cop|floatformat:0|intcomma }} · Wompi ${{ g.pedido.tarifa_pasarela_cop|floatformat:0|intcomma }}</td>
+        <td><strong>${{ g.monto_cop|floatformat:0|intcomma }}</strong></td>
+        <td>{{ g.get_estado_display }}</td>
+      </tr>
+    {% endfor %}
+    {% if not staff_oficios and not staff_giros %}
+      <tr><td colspan="7">No hay consignaciones pendientes.</td></tr>
+    {% endif %}
+  </table>
+{% endif %}
+
+<div class="pay-grid">
+  <section class="card">
+    <p>Debes pagar</p>
+    <strong>${{ por_pagar|floatformat:0|intcomma }}</strong>
+    <p>Inscripción, mensualidad, pedidos o citas que aún no aprueba Wompi.</p>
+  </section>
+  <section class="card">
+    <p>Pagos recibidos</p>
+    <strong>${{ recibido|floatformat:0|intcomma }}</strong>
+    <p>Giros a tu Nequi ya marcados como pagados.</p>
+  </section>
+  <section class="card">
+    <p>Ventas</p>
+    <strong>{{ ventas|length }}</strong>
+    <p>Pedidos de tu tienda.</p>
+  </section>
+  <section class="card">
+    <p>Compras</p>
+    <strong>{{ compras|length }}</strong>
+    <p>Lo que pediste en el catálogo o al por mayor.</p>
+  </section>
+  <section class="card">
+    <p>Oficios</p>
+    <strong>{{ citas_contratadas|length }} / {{ citas_recibidas|length }}</strong>
+    <p>Contratados / recibidos.</p>
+  </section>
+</div>
+
+{% if oferente %}
+  <h2>Oferente</h2>
+  <p class="meta">{{ oferente.nombre }} · {{ oferente.oficio_texto }} · {{ oferente.get_estado_display }}
+    {% if oferente.mensualidad_hasta %} · visible hasta {{ oferente.mensualidad_hasta|date:"d/m/Y" }}{% endif %}
+  </p>
+  {% if cobro_alta and cobro_alta.estado_pago != "aprobado" %}
+    <div class="note">
+      <p><strong>Inscripción ${{ primera|floatformat:0|intcomma }} (incluye el primer mes)</strong></p>
+      <p>Un solo cobro. Referencia {{ cobro_alta.referencia_pago }}. El mes siguiente ERA shop abre ${{ mensualidad|floatformat:0|intcomma }}.</p>
+    </div>
+    {% with cobro=cobro_alta wompi=wompi_alta %}
+      {% include "servicios/_wompi.html" %}
+    {% endwith %}
+  {% elif cobro_mes and cobro_mes.estado_pago != "aprobado" %}
+    <div class="note">
+      <p><strong>Mensualidad automática: ${{ mensualidad|floatformat:0|intcomma }}</strong></p>
+      <p>ERA shop te abrió este cobro para seguir apareciendo. Si no lo pagas, sales del listado. Referencia {{ cobro_mes.referencia_pago }}.</p>
+    </div>
+    {% with cobro=cobro_mes wompi=wompi_mes %}
+      {% include "servicios/_wompi.html" %}
+    {% endwith %}
+  {% elif oferente.visible %}
+    <p class="ok">Estás visible. El próximo mes ERA shop abre solo el cobro de ${{ mensualidad|floatformat:0|intcomma }}.</p>
+  {% endif %}
+{% endif %}
+
+{% if deudas %}
+  <h2>Cuánto debes pagar</h2>
+  <table>
+    <tr><th>Qué</th><th>Monto</th><th></th></tr>
+    {% for d in deudas %}
+      <tr>
+        <td>{{ d.que }}</td>
+        <td>${{ d.monto|floatformat:0|intcomma }}</td>
+        <td>{% if d.url %}<a href="{{ d.url }}">Pagar</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endif %}
+
+<h2>Ventas</h2>
+{% if vendedor %}
+<table>
+  <tr><th>#</th><th>Qué</th><th>Cliente</th><th>Pago</th><th>Pedido</th><th>Te llegan</th><th></th></tr>
+  {% for p in ventas %}
+    <tr>
+      <td>{{ p.id }}</td>
+      <td>{% if p.lineas.all %}{{ p.lineas.all|length }} productos{% else %}{{ p.producto.titulo|truncatechars:40 }}{% endif %}</td>
+      <td>{{ p.cliente_nombre }}<br><small>{{ p.cliente_ciudad }}</small></td>
+      <td>{{ p.get_estado_pago_display }}</td>
+      <td>{{ p.get_estado_display }}</td>
+      <td>${{ p.neto_vendedor|floatformat:0|intcomma }}{% if p.giro %}<br><small>{{ p.giro.get_estado_display }}</small>{% endif %}</td>
+      <td><a href="{% url 'conversacion_pedido' p.id %}">Abrir</a></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="7">Aún no tienes ventas.</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="muted">Cuando vendas en el catálogo, los pedidos salen aquí.</p>
+{% endif %}
+
+<h2>Despachos</h2>
+<table>
+  <tr><th>#</th><th>Estado</th><th>Guía</th><th>Fecha</th><th></th></tr>
+  {% for p in despachos %}
+    <tr>
+      <td>{{ p.id }}</td>
+      <td>{{ p.get_estado_display }}</td>
+      <td>{{ p.tracking|default:"—" }}</td>
+      <td>{% if p.fecha_despacho %}{{ p.fecha_despacho|date:"d/m/Y" }}{% else %}{{ p.creado|date:"d/m/Y" }}{% endif %}</td>
+      <td><a href="{% url 'conversacion_pedido' p.id %}">Abrir</a></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5">Sin despachos todavía.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Compras</h2>
+<table>
+  <tr><th>#</th><th>Qué</th><th>Tienda</th><th>Pago</th><th>Pedido</th><th>Total</th><th></th></tr>
+  {% for p in compras %}
+    <tr>
+      <td>{{ p.id }}</td>
+      <td>{% if p.lineas.all %}{% for l in p.lineas.all %}{{ l.titulo|truncatechars:28 }} × {{ l.cantidad }}{% if not forloop.last %}<br>{% endif %}{% endfor %}{% else %}{{ p.producto.titulo|truncatechars:40 }}{% endif %}</td>
+      <td>{% if p.vendedor %}{{ p.vendedor.nombre_tienda }}{% else %}ERA shop{% endif %}</td>
+      <td>{{ p.get_estado_pago_display }}</td>
+      <td>{{ p.get_estado_display }}</td>
+      <td>${{ p.monto_cop|floatformat:0|intcomma }}</td>
+      <td><a href="{% url 'conversacion_pedido' p.id %}">Abrir</a></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="7">Aún no has comprado.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Servicios que contrataste</h2>
+<table>
+  <tr><th>Cuando</th><th>Oferente</th><th>Pago</th><th>Trabajo</th><th></th></tr>
+  {% for c in citas_contratadas %}
+    <tr>
+      <td>{{ c.inicio|date:"d/m/Y h:i a" }}</td>
+      <td>{{ c.oferente.nombre }}<br><small>{% if c.especialidad %}{{ c.especialidad.oficio_texto }}{% else %}{{ c.oferente.oficio_texto }}{% endif %}</small></td>
+      <td>${{ c.monto_cop|floatformat:0|intcomma }} · {{ c.estado_pago }}</td>
+      <td>{% if c.trabajo_realizado %}Realizado{% elif c.estado_pago == "aprobado" %}Espera tu visto bueno{% else %}{{ c.estado }}{% endif %}</td>
+      <td><a href="{% url 'resultado_cita' c.id %}?clave={{ c.clave_contacto }}">Abrir</a></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5">No has contratado oficios.</td></tr>
+  {% endfor %}
+</table>
+{% if consultas_hechas %}
+  <p class="muted">Cotizaciones abiertas:</p>
+  <ul>
+    {% for q in consultas_hechas %}
+      <li><a href="{% url 'consulta_servicio' q.id %}?clave={{ q.clave }}">{{ q.oferente.nombre }} · {{ q.creado|date:"d/m H:i" }}</a></li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+<h2>Servicios que te contrataron</h2>
+{% if oferente %}
+<table>
+  <tr><th>Cuando</th><th>Cliente</th><th>Pago</th><th>Giro</th><th></th></tr>
+  {% for c in citas_recibidas %}
+    <tr>
+      <td>{{ c.inicio|date:"d/m/Y h:i a" }}</td>
+      <td>
+        {% if c.estado_pago == "aprobado" %}{{ c.cliente_nombre }}{% else %}Reservado{% endif %}
+      </td>
+      <td>${{ c.monto_cop|floatformat:0|intcomma }} · {{ c.estado_pago }}{% if c.trabajo_realizado %}<br><small>Hecho</small>{% endif %}</td>
+      <td>{% if c.giro %}${{ c.giro.monto_cop|floatformat:0|intcomma }} · {{ c.giro.get_estado_display }}{% else %}—{% endif %}</td>
+      <td>{% if c.clave_contacto %}<a href="{% url 'resultado_cita' c.id %}?clave={{ c.clave_contacto }}">Abrir</a>{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5">Nadie te ha reservado todavía.</td></tr>
+  {% endfor %}
+</table>
+{% if consultas_recibidas %}
+  <p class="muted">Preguntas de precio:</p>
+  <ul>
+    {% for q in consultas_recibidas %}
+      <li><a href="{% url 'consulta_servicio' q.id %}?clave={{ q.clave }}">{{ q.cliente_nombre }} · {{ q.creado|date:"d/m H:i" }}</a></li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% else %}
+<p class="muted">Si ofreces un oficio y pagas para aparecer, las citas y los giros salen aquí.</p>
+{% endif %}
+
+<h2>Pagos recibidos · cada consignación</h2>
+<table>
+  <tr><th>Cuando</th><th>Origen</th><th>Nequi destino</th><th>Pagó el cliente</th><th>Descuentos</th><th>Te consignan</th><th>Estado</th></tr>
+  {% for g in giros_venta %}
+    <tr>
+      <td>{{ g.creado|date:"d/m/Y H:i" }}</td>
+      <td>Venta pedido #{{ g.pedido_id }}</td>
+      <td>{{ g.destino_nequi|default:"—" }}</td>
+      <td>${{ g.pedido.monto_cop|floatformat:0|intcomma }}</td>
+      <td>Comisión ${{ g.pedido.comision_cop|floatformat:0|intcomma }} · Wompi ${{ g.pedido.tarifa_pasarela_cop|floatformat:0|intcomma }}</td>
+      <td>${{ g.monto_cop|floatformat:0|intcomma }}</td>
+      <td>{{ g.get_estado_display }}{% if g.detalle %}<br><small>{{ g.detalle }}</small>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  {% for g in giros_oficio %}
+    <tr>
+      <td>{{ g.creado|date:"d/m/Y H:i" }}</td>
+      <td>Cita #{{ g.cita_id }}</td>
+      <td>{{ g.destino_nequi|default:"—" }}</td>
+      <td>${{ g.cita.monto_cop|floatformat:0|intcomma }}</td>
+      <td>Comisión ${{ g.comision_cop|floatformat:0|intcomma }} · Wompi ${{ g.cita.tarifa_pasarela_cop|floatformat:0|intcomma }}</td>
+      <td>${{ g.monto_cop|floatformat:0|intcomma }}</td>
+      <td>{{ g.get_estado_display }}{% if g.detalle %}<br><small>{{ g.detalle }}</small>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  {% if not giros_venta and not giros_oficio %}
+    <tr><td colspan="7">Todavía no hay giros a tu Nequi.</td></tr>
+  {% endif %}
+</table>
+
+<h2>Pagos hechos</h2>
+<table>
+  <tr><th>Cuando</th><th>Qué</th><th>Monto</th><th>Estado</th><th></th></tr>
+  {% for f in pagos_hechos %}
+    <tr>
+      <td>{{ f.cuando|date:"d/m/Y H:i" }}</td>
+      <td>{{ f.que }}</td>
+      <td>${{ f.monto|floatformat:0|intcomma }}</td>
+      <td>{{ f.estado }}</td>
+      <td>{% if f.url %}<a href="{{ f.url }}">Ver</a>{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5">Todavía no hay pagos de tu parte.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

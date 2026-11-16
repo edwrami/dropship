@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Registro · ERA shop{% endblock %}
+{% block content %}
+<p class="eyebrow">Una sola cuenta</p>
+<h1>Cómo quieres entrar</h1>
+<p class="lede">Elige el rol de ahora. El mismo correo sirve para comprar, vender, contratar oficios y ofrecerlos. Quien quiere aparecer como oferente paga inscripción y mensualidad.</p>
+{% if logueado %}
+  <div class="ok">Ya estás dentro. El formulario que elijas se suma a este correo.</div>
+{% endif %}
+<div class="catalog">
+  <article class="product">
+    <div class="body">
+      <p class="kicker">Cliente</p>
+      <h3>Quiero comprar</h3>
+      <p class="meta">Al detal en el catálogo. Si tu tienda pide a fabricantes, márcalo en el formulario.</p>
+      <a class="btn" href="{% url 'registro_cuenta' %}?rol=cliente{% if next %}&next={{ next|urlencode }}{% endif %}">Registro de cliente</a>
+    </div>
+  </article>
+  <article class="product">
+    <div class="body">
+      <p class="kicker">Vendedor al detal</p>
+      <h3>Quiero vender en el catálogo</h3>
+      <p class="meta">Persona o tienda. Recibes en Nequi cuando el cliente paga. Con este correo también compras.</p>
+      <a class="btn" href="{% url 'registro_cuenta' %}?rol=detal{% if next %}&next={{ next|urlencode }}{% endif %}">Registro al detal</a>
+    </div>
+  </article>
+  <article class="product">
+    <div class="body">
+      <p class="kicker">Mayorista</p>
+      <h3>Quiero vender al por mayor</h3>
+      <p class="meta">Fabricante, mayorista o importador. Lista de mayor y también vitrina al detal.</p>
+      <a class="btn" href="{% url 'registro_cuenta' %}?rol=mayorista{% if next %}&next={{ next|urlencode }}{% endif %}">Registro de mayorista</a>
+    </div>
+  </article>
+  <article class="product">
+    <div class="body">
+      <p class="kicker">Oferente</p>
+      <h3>Quiero ofrecer un oficio</h3>
+      <p class="meta">$100.000 de inscripción (incluye el primer mes), $50.000 cada mes siguiente y comisión en cada cita. Con el mismo correo contratas a otros y compras en el catálogo.</p>
+      <a class="btn" href="{% url 'registro_oferente' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Registro de oferente</a>
+    </div>
+  </article>
+</div>
+<p class="muted">¿Ya tienes cuenta? <a href="{% url 'entrar_cuenta' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Entrar</a></p>
+{% endblock %}

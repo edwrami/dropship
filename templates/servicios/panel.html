@@ -10,15 +10,23 @@
   <a class="btn sec" href="{% url 'horarios_oferente' %}">Agenda</a>
   <a class="btn sec" href="{% url 'fotos_oferente' %}">Fotos ({{ fotos|length }}/10)</a>
   <a class="btn sec" href="{% url 'ampliar_oferente' %}">Otra ciudad u oficio</a>
-  {% if oferente.estado != "activo" %}
-    <a class="btn" href="{% url 'activar_oferente' %}">Pagar ${{ cuota|floatformat:0|intcomma }} para aparecer</a>
+  <a class="btn sec" href="{% url 'mi_panel' %}">Mi panel</a>
+  {% if not oferente.inscripcion_pagada %}
+    <a class="btn" href="{% url 'activar_oferente' %}">Pagar inscripción ${{ cuota|floatformat:0|intcomma }} (incluye el primer mes)</a>
+  {% elif not aparece %}
+    <a class="btn" href="{% url 'mensualidad_oferente' %}">Pagar mensualidad ${{ mensualidad|floatformat:0|intcomma }}</a>
   {% else %}
     <a class="btn sec" href="{% url 'detalle_oferente' oferente.slug %}">Ver página pública</a>
+    <a class="btn sec" href="{% url 'mensualidad_oferente' %}">Renovar mes</a>
   {% endif %}
-  <a class="btn sec" href="{% url 'salir_oferente' %}">Salir</a>
+  <a class="btn sec" href="{% url 'salir_vendedor' %}">Salir</a>
 </p>
-{% if oferente.estado != "activo" %}
-  <div class="note">Todavía no apareces. Paga la cuota de ${{ cuota|floatformat:0|intcomma }} por Wompi.</div>
+{% if not oferente.inscripcion_pagada %}
+  <div class="note">Todavía no apareces. Paga ${{ cuota|floatformat:0|intcomma }} de inscripción; incluye el primer mes. Después ERA shop te cobra ${{ mensualidad|floatformat:0|intcomma }} cada mes. Contratar a otros no cobra eso.</div>
+{% elif not aparece %}
+  <div class="note">La inscripción está paga. Falta la mensualidad de ${{ mensualidad|floatformat:0|intcomma }} para salir en el listado.</div>
+{% else %}
+  <p class="ok">Visible hasta {{ oferente.mensualidad_hasta|date:"d/m/Y" }}. Cada cita descuenta la comisión de ERA shop.</p>
 {% endif %}
 
 <h3>Dónde apareces</h3>

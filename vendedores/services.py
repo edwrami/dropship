@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Avg, F, Max, Min
+from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from pedidos.models import Pedido
@@ -211,20 +212,37 @@ def aplicar_sanciones():
     return retirados
 
 
-def devolver_stock(pedido):
+def _lineas_stock(pedido):
     lineas = list(pedido.lineas.all()) if pedido.pk else []
     if lineas:
-        for linea in lineas:
-            if linea.producto_id and linea.cantidad:
-                Producto.objects.filter(pk=linea.producto_id, controla_stock=True).update(
-                    stock=F("stock") + linea.cantidad
-                )
+        return [(linea.producto_id, linea.cantidad) for linea in lineas if linea.producto_id]
+    if pedido.producto_id and pedido.cantidad:
+        return [(pedido.producto_id, pedido.cantidad)]
+    return []
+
+
+def tomar_stock(pedido):
+    """Descuenta unidades solo cuando Wompi aprueba, una sola vez."""
+    if pedido.stock_tomado:
         return
-    if not pedido.producto_id or not pedido.cantidad:
+    for producto_id, cantidad in _lineas_stock(pedido):
+        Producto.objects.filter(pk=producto_id, controla_stock=True).update(
+            stock=Greatest(F("stock") - cantidad, 0)
+        )
+    pedido.stock_tomado = True
+    pedido.save(update_fields=["stock_tomado"])
+
+
+def devolver_stock(pedido):
+    if not pedido.stock_tomado:
         return
-    Producto.objects.filter(pk=pedido.producto_id, controla_stock=True).update(
-        stock=F("stock") + pedido.cantidad
-    )
+    for producto_id, cantidad in _lineas_stock(pedido):
+        if producto_id and cantidad:
+            Producto.objects.filter(pk=producto_id, controla_stock=True).update(
+                stock=F("stock") + cantidad
+            )
+    pedido.stock_tomado = False
+    pedido.save(update_fields=["stock_tomado"])
 
 
 @transaction.atomic

@@ -2,6 +2,7 @@
 {% block content %}
   <p class="eyebrow">{{ vendedor.get_tipo_display }}</p>
   <h2>{{ vendedor.nombre_tienda }}</h2>
+  <p><a class="btn sec" href="{% url 'mi_panel' %}">Mi panel</a></p>
   {% if vendedor.tipo == "virtual" or vendedor.tipo == "persona" or vendedor.tipo == "dropshipper" %}
     <p class="muted">Vendes sin local. La ciudad es desde donde despachas. Publicar producto abre la ficha completa.</p>
   {% elif vendedor.es_proveedor %}

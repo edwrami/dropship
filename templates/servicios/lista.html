@@ -6,16 +6,16 @@
   <div>
     <p class="eyebrow">Servicios</p>
     <h1>Quién te hace el trabajo</h1>
-    <p class="lede">Transporte, plomería, arreglos del hogar, veterinario de urgencias, salud, mecánica y el resto de oficios. Ves la ficha, la calificación y los huecos libres. El teléfono aparece cuando pagas la cita por Wompi.</p>
+    <p class="lede">Contrata con la misma cuenta de ERA shop. Quien quiere aparecer como oferente paga ${{ cuota|floatformat:0|intcomma }} de inscripción (incluye el primer mes) y ${{ mensualidad|floatformat:0|intcomma }} cada mes siguiente. Ves la calificación promedio y los comentarios antes de contratar. El teléfono sale cuando pagas la cita.</p>
     <p>
-      <a class="btn" href="{% url 'registro_oferente' %}">Ofrecer un servicio</a>
-      <a class="btn sec" href="{% url 'entrar_oferente' %}">Entrar como oferente</a>
+      <a class="btn" href="{% url 'registro_oferente' %}">Ofrecer un oficio</a>
+      <a class="btn sec" href="{% url 'entrar_cuenta' %}">Entrar</a>
     </p>
   </div>
   <aside class="hero-card">
-    <p>Para aparecer</p>
-    <strong>${{ cuota|floatformat:0|intcomma }}</strong>
-    <p>Un oficio en un municipio. Cada ciudad o especialidad extra: otros ${{ cuota|floatformat:0|intcomma }}.</p>
+    <p>Para aparecer como oferente</p>
+    <strong>${{ cuota|floatformat:0|intcomma }} · luego ${{ mensualidad|floatformat:0|intcomma }}/mes</strong>
+    <p>La inscripción de ${{ cuota|floatformat:0|intcomma }} incluye el primer mes. Los siguientes meses ERA shop abre solo la mensualidad. Cada cita: comisión de ERA shop. Ciudad u oficio extra: otros ${{ cuota|floatformat:0|intcomma }}.</p>
     <p>{% if total == 1 %}1 oferente visible{% else %}{{ total }} oferentes visibles{% endif %}</p>
   </aside>
 </section>
@@ -58,7 +58,7 @@
 </details>
 
 {% if not oferentes %}
-  <p class="note">Todavía no hay oferentes visibles. Quien quiera aparecer paga ${{ cuota|floatformat:0|intcomma }} por Wompi.</p>
+  <p class="note">Todavía no hay oferentes visibles. Quien quiera aparecer paga ${{ cuota|floatformat:0|intcomma }} por Wompi (inscripción e incluye el primer mes).</p>
 {% else %}
   <div class="catalog">
     {% for o in oferentes %}

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 
 from vendedores.opciones import DEPARTAMENTOS_CHOICES
@@ -9,7 +10,8 @@ from .oficios import DIAS, MODOS_COBRO, MODOS_TIEMPO, RUBROS, UNIDADES
 
 class Oferente(models.Model):
     ESTADOS = [
-        ("pendiente_pago", "Falta pagar la cuota para aparecer"),
+        ("pendiente_pago", "Falta la inscripción"),
+        ("pendiente_mensualidad", "Falta la mensualidad para aparecer"),
         ("activo", "Visible en servicios"),
         ("suspendido", "Retirado"),
     ]
@@ -34,11 +36,12 @@ class Oferente(models.Model):
     unidad = models.CharField(max_length=20, choices=UNIDADES, default="visita")
     duracion_minutos = models.PositiveSmallIntegerField(default=60)
     disponible_ahora = models.BooleanField(default=True)
-    estado = models.CharField(max_length=20, choices=ESTADOS, default="pendiente_pago", db_index=True)
+    estado = models.CharField(max_length=30, choices=ESTADOS, default="pendiente_pago", db_index=True)
     visitas = models.PositiveIntegerField(default=0)
     foto_url = models.URLField(max_length=800, blank=True)
     foto_ruta = models.CharField(max_length=300, blank=True)
     acepta_terminos = models.BooleanField(default=False)
+    mensualidad_hasta = models.DateTimeField(null=True, blank=True, db_index=True)
     creado = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -65,8 +68,19 @@ class Oferente(models.Model):
         super().save(*args, **kwargs)
 
     @property
+    def inscripcion_pagada(self):
+        act = getattr(self, "activacion", None)
+        if act is not None and act.estado_pago == "aprobado":
+            return True
+        return self.estado in ("activo", "pendiente_mensualidad")
+
+    @property
+    def mensualidad_al_dia(self):
+        return bool(self.mensualidad_hasta and self.mensualidad_hasta >= timezone.now())
+
+    @property
     def visible(self):
-        return self.estado == "activo"
+        return self.estado == "activo" and self.mensualidad_al_dia
 
     @property
     def oficio_texto(self):
@@ -196,6 +210,28 @@ class PagoActivacion(models.Model):
         return self.referencia_pago
 
 
+class PagoMensualidad(models.Model):
+    oferente = models.ForeignKey(Oferente, related_name="pagos_mensuales", on_delete=models.CASCADE)
+    monto_cop = models.DecimalField(max_digits=14, decimal_places=2)
+    referencia_pago = models.CharField(max_length=80, unique=True)
+    estado_pago = models.CharField(max_length=20, default="pendiente", db_index=True)
+    wompi_id = models.CharField(max_length=80, blank=True)
+    metodo_pago = models.CharField(max_length=40, blank=True)
+    cubre_hasta = models.DateTimeField(null=True, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def cliente_email(self):
+        if self.oferente.email:
+            return self.oferente.email
+        if self.oferente.user_id:
+            return self.oferente.user.email or ""
+        return ""
+
+    def __str__(self):
+        return self.referencia_pago
+
+
 class PagoExtra(models.Model):
     TIPOS = [
         ("ciudad", "Otra ciudad o municipio"),
@@ -295,7 +331,7 @@ class GiroCita(models.Model):
     monto_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     comision_cop = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     destino_nequi = models.CharField(max_length=20, blank=True)
-    estado = models.CharField(max_length=20, choices=ESTADOS, default="pendiente")
+    estado = models.CharField(max_length=20, choices=ESTADOS, default="pendiente", db_index=True)
     payout_id = models.CharField(max_length=80, blank=True)
     detalle = models.CharField(max_length=300, blank=True)
     creado = models.DateTimeField(auto_now_add=True)
