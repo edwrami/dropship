@@ -372,8 +372,8 @@ def fotos(request):
             messages.success(request, "Foto quitada.")
             return redirect("fotos_oferente")
         archivos = request.FILES.getlist("fotos")
-        if len(actuales) + len(archivos) > 10:
-            messages.error(request, "Puedes tener hasta 10 fotos de tus trabajos.")
+        if len(actuales) + len(archivos) > 5:
+            messages.error(request, "Puedes tener hasta 5 fotos de tus trabajos.")
             return redirect("fotos_oferente")
         try:
             preparados = [extension(archivo) for archivo in archivos]

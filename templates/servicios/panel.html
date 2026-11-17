@@ -8,7 +8,7 @@
 <p>
   <a class="btn sec" href="{% url 'ficha_oferente' %}">Ficha</a>
   <a class="btn sec" href="{% url 'horarios_oferente' %}">Agenda</a>
-  <a class="btn sec" href="{% url 'fotos_oferente' %}">Fotos ({{ fotos|length }}/10)</a>
+  <a class="btn sec" href="{% url 'fotos_oferente' %}">Fotos ({{ fotos|length }}/5)</a>
   <a class="btn sec" href="{% url 'ampliar_oferente' %}">Otra ciudad u oficio</a>
   <a class="btn sec" href="{% url 'mi_panel' %}">Mi panel</a>
   {% if not oferente.inscripcion_pagada %}

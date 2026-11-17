@@ -6,12 +6,21 @@
   <div>
     <div class="photo">
       {% if oferente.fotos.all %}
-        <div class="slider">
+        <div class="slider" data-slider tabindex="0" aria-label="Fotos del trabajo">
           <div class="slider-track">
             {% for f in oferente.fotos.all %}
-              <img src="{{ f.url }}" alt="Trabajo {{ f.orden }}">
+              <img src="{{ f.url }}" alt="{{ oferente.nombre }}, foto {{ forloop.counter }}">
             {% endfor %}
           </div>
+          {% if oferente.fotos.count > 1 %}
+            <button type="button" class="slider-nav prev" data-dir="-1" aria-label="Foto anterior">‹</button>
+            <button type="button" class="slider-nav next" data-dir="1" aria-label="Foto siguiente">›</button>
+            <div class="slider-dots">
+              {% for f in oferente.fotos.all %}
+                <button type="button" class="dot{% if forloop.first %} on{% endif %}" data-i="{{ forloop.counter0 }}" aria-label="Ir a la foto {{ forloop.counter }}"></button>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
       {% elif oferente.foto_url %}
         <img src="{{ oferente.foto_url }}" alt="{{ oferente.nombre }}">
