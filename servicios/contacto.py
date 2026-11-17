@@ -11,11 +11,11 @@ _PALABRAS = re.compile(
 
 
 def sin_contacto(texto):
-    """Quita teléfonos, correos y WhatsApp. El contacto solo sale después del pago."""
+    """Quita teléfonos, correos y WhatsApp. Esos datos no se publican."""
     limpio = texto or ""
-    limpio = _WA.sub("[contacto después del pago]", limpio)
-    limpio = _MAIL.sub("[contacto después del pago]", limpio)
-    limpio = _TELEFONO.sub("[contacto después del pago]", limpio)
-    limpio = _DIGITO.sub("[contacto después del pago]", limpio)
+    limpio = _WA.sub("[dato privado]", limpio)
+    limpio = _MAIL.sub("[dato privado]", limpio)
+    limpio = _TELEFONO.sub("[dato privado]", limpio)
+    limpio = _DIGITO.sub("[dato privado]", limpio)
     limpio = _PALABRAS.sub("hablemos aquí", limpio)
     return limpio.strip()[:2000]

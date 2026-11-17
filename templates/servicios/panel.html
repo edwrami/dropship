@@ -40,7 +40,7 @@
   <ul>
     {% for q in consultas %}
       <li>
-        <a href="{% url 'consulta_servicio' q.id %}?clave={{ q.clave }}">{{ q.cliente_nombre }} · {{ q.especialidad.oficio_texto|default:oferente.oficio_texto }} · {{ q.creado|date:"d/m H:i" }}</a>
+        <a href="{% url 'consulta_servicio' q.id %}?clave={{ q.clave }}">Cliente · {{ q.especialidad.oficio_texto|default:oferente.oficio_texto }} · {{ q.creado|date:"d/m H:i" }}</a>
         {% if not q.visto_oferente %}<strong>nuevo</strong>{% endif %}
       </li>
     {% endfor %}
@@ -68,8 +68,7 @@
           <td>{{ c.inicio|date:"d/m/Y h:i a" }}</td>
           <td>
             {% if c.estado_pago == "aprobado" %}
-              {{ c.cliente_nombre }}<br>{{ c.cliente_telefono }}
-              {% if c.cliente_email %}<br>{{ c.cliente_email }}{% endif %}
+              Cliente · pago confirmado. No ves su teléfono.
             {% else %}
               Reservado · espera el pago
             {% endif %}

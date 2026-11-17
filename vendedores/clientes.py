@@ -388,8 +388,11 @@ def _confirmar_carrito(request, cliente, proveedor, carrito):
             errores.append(f"De {titulo} solo hay {producto.stock}.")
             continue
         precio = Decimal(producto.precio_mayor_cop)
+        from pedidos.flete import cotizar
         modo = producto.modo_envio or ("incluido" if producto.envio_gratis else "aparte")
-        envio_linea = Decimal(producto.costo_envio_cop or 0) if modo == "aparte" else Decimal("0")
+        envio_linea = Decimal("0")
+        if not cotizar(producto.vendedor, cliente, getattr(producto.vendedor, "paga_flete", "")) and modo == "aparte":
+            envio_linea = Decimal(producto.costo_envio_cop or 0)
         subtotal = peso(precio * cantidad)
         bienes += subtotal
         envio_total += envio_linea
@@ -437,6 +440,8 @@ def _confirmar_carrito(request, cliente, proveedor, carrito):
     )
     pedido.referencia_pago = f"PED-{pedido.id}"
     aplicar_comision(pedido)
+    from pedidos.flete import sumar_flete
+    sumar_flete(pedido, proveedor, cliente)
     pedido.save()
     textos = []
     for linea, producto, cantidad, precio, modo_linea, envio_linea, subtotal in preparados:
@@ -458,8 +463,8 @@ def _confirmar_carrito(request, cliente, proveedor, carrito):
         autor="plataforma",
         nombre="ERA shop",
         texto=(
-            f"Pedido al por mayor de {cliente.nombre_tienda}, responsable {cliente.responsable}. "
-            f"{factura} Queda guardado para el establecimiento y para el proveedor.\n"
+            f"Pedido al por mayor. {factura} ERA shop recoge y entrega. "
+            f"El establecimiento y el proveedor no se conocen.\n"
             + "\n".join(textos)
         ),
     )
@@ -792,15 +797,17 @@ def _cerrar_carrito(comprador, carrito):
                     )
             pedidos.append(pedido)
         cargos_mostrador_grupo(pedidos)
+        from pedidos.flete import sumar_flete
         for pedido in pedidos:
+            sumar_flete(pedido, pedido.vendedor, comprador)
             pedido.save()
             MensajePedido.objects.create(
                 pedido=pedido,
                 autor="plataforma",
                 nombre="ERA shop",
                 texto=(
-                    "Pedido creado desde el carrito. El teléfono, WhatsApp, correo y dirección "
-                    "del vendedor aparecen cuando la transferencia quede aprobada."
+                    "Pedido creado. ERA shop recoge y entrega. Quien compra y quien vende no se conocen. "
+                    "El flete sale de los dos puntos del mapa."
                 ),
             )
         compra.referencia_pago = f"COM-{compra.id}"

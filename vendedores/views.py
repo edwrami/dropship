@@ -134,6 +134,9 @@ def datos(request):
         "whatsapp": vendedor.whatsapp,
         "nequi": vendedor.nequi,
         "direccion": vendedor.direccion,
+        "lat": vendedor.lat,
+        "lng": vendedor.lng,
+        "paga_flete": vendedor.paga_flete or "comprador",
         "ciudad": vendedor.ciudad,
         "departamento": vendedor.departamento,
         "tipo": vendedor.tipo,
@@ -152,7 +155,7 @@ def datos(request):
             form.add_error(None, "Elige al menos una categoría.")
         else:
             data = form.cleaned_data
-            for campo in ("telefono", "whatsapp", "nequi", "direccion", "ciudad", "departamento", "tipo", "frase", "horario"):
+            for campo in ("telefono", "whatsapp", "nequi", "direccion", "lat", "lng", "paga_flete", "ciudad", "departamento", "tipo", "frase", "horario"):
                 setattr(vendedor, campo, data[campo].strip() if isinstance(data[campo], str) else data[campo])
             logo = request.FILES.get("logo")
             if logo is not None:

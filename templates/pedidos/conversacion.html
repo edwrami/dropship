@@ -3,7 +3,7 @@
 {% block title %}Pedido #{{ pedido.id }} · ERA shop{% endblock %}
 {% block content %}
   <p class="kicker">Pedido #{{ pedido.id }} · {{ pedido.referencia_pago }}</p>
-  <h2>{% if pedido.lineas.all %}Pedido de {{ pedido.cliente_nombre }}{% else %}{{ pedido.producto.titulo }}{% endif %}</h2>
+  <h2>{% if rol == "plataforma" and pedido.lineas.all %}Pedido de {{ pedido.cliente_nombre }}{% elif pedido.producto %}{{ pedido.producto.titulo }}{% else %}Pedido{% endif %}</h2>
   <p class="price">${{ pedido.monto_cop|floatformat:0|intcomma }} COP · {{ pedido.cantidad }} und.</p>
   {% if pedido.lineas.all %}
     <ul>
@@ -24,14 +24,14 @@
     <p>Tienda: <strong>{{ pedido.vendedor.nombre_tienda }}</strong> · {{ pedido.vendedor.get_tipo_display }} · {{ pedido.vendedor.ciudad }}</p>
   {% endif %}
   {% include "vendedores/_contacto.html" %}
-  <p class="note">Esta conversación es el canal del pedido. El teléfono del vendedor aparece cuando la transferencia queda aprobada.</p>
+  <p class="note">ERA shop recoge y entrega. Quien compra y quien vende no se conocen.{% if pedido.flete_cop %} Flete ${{ pedido.flete_cop|floatformat:0|intcomma }} · {{ pedido.flete_km }} km · {% if pedido.flete_paga == "vendedor" %}lo paga quien vende{% elif pedido.flete_paga == "mitad" %}por mitad{% else %}lo paga quien compra{% endif %}.{% endif %}</p>
   <p><a class="btn sec" href="{% url 'resumen_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar resumen</a>
     {% if pedido.estado_pago == "aprobado" %}<a class="btn" href="{% url 'recibo_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar comprobante</a>{% endif %}
-    {% if pedido.es_mayor %}<a class="btn" href="{% url 'bodega_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar para bodega (Word)</a>{% endif %}
+    {% if rol == "plataforma" and pedido.es_mayor %}<a class="btn" href="{% url 'bodega_pedido' pedido.id %}?clave={{ pedido.clave_contacto }}">Descargar para bodega (Word)</a>{% endif %}
     {% if rol == "cliente" %}<a class="btn sec" href="{% url 'historial_comprador' %}">Ver mi historial</a>{% endif %}
   </p>
 
-  {% if rol == "vendedor" or rol == "plataforma" %}
+  {% if rol == "plataforma" %}
     <div class="card">
       <p><strong>Estado del pedido</strong></p>
       {% if pedido.estado == "pendiente" %}
@@ -73,6 +73,13 @@
     </div>
   {% endif %}
 
+  {% if rol == "vendedor" and pedido.estado == "pagado" or rol == "vendedor" and pedido.estado == "comprado" or rol == "vendedor" and pedido.estado == "en_casillero" %}
+    <form method="post" class="card">{% csrf_token %}
+      <p>El pago ya entró. Marque cuando el paquete esté listo. ERA shop lo recoge. Usted no ve quién compra.</p>
+      <button class="btn" name="accion" value="empacado" type="submit">Marcar empacado</button>
+    </form>
+  {% endif %}
+
   {% if rol == "cliente" and pedido.estado == "entregado" and pedido.vendedor and not calificacion %}
     <form method="post" class="card" style="max-width:640px">{% csrf_token %}
       <input type="hidden" name="accion" value="calificar">
@@ -106,31 +113,22 @@
     </form>
   {% endif %}
 
+  {% if rol == "plataforma" %}
   <div class="card">
-    <p><strong>Datos del cliente</strong></p>
+    <p><strong>Datos para el transporte. Solo ERA shop los ve.</strong></p>
     <p>{{ pedido.cliente_nombre }}{% if pedido.cliente_documento %} · cédula {{ pedido.cliente_documento }}{% endif %}</p>
     <p>{{ pedido.cliente_telefono }}{% if pedido.cliente_email %} · {{ pedido.cliente_email }}{% endif %}</p>
     <p>{{ pedido.cliente_direccion }}{% if pedido.cliente_barrio %}, {{ pedido.cliente_barrio }}{% endif %}</p>
     <p>{{ pedido.cliente_ciudad }}{% if pedido.cliente_departamento %}, {{ pedido.cliente_departamento }}{% endif %}</p>
     {% if pedido.cliente_referencia %}<p>Referencia: {{ pedido.cliente_referencia }}</p>{% endif %}
-    {% if pedido.variante %}<p>Variante: {{ pedido.variante }}</p>{% endif %}
-    {% if pedido.modo_envio == "contraentrega" %}
-      <p>El envío se paga contraentrega. No entra en el pago de la página.</p>
-    {% elif pedido.modo_envio == "aparte" %}
-      <p>Envío cobrado en el pedido: ${{ pedido.envio_cop|floatformat:0|intcomma }}.</p>
-    {% elif pedido.modo_envio == "incluido" %}
-      <p>El precio incluye el envío.</p>
-    {% endif %}
     {% if pedido.transportadora %}
-      <p>Despacho: {{ pedido.transportadora }} · guía {{ pedido.tracking }}{% if pedido.fecha_despacho %} · {{ pedido.fecha_despacho|date:"d/m/Y" }}{% endif %}</p>
-      <p>Recibe: {{ pedido.recibe_nombre }} · cédula {{ pedido.recibe_documento }} · {{ pedido.recibe_telefono }}</p>
-      {% if pedido.detalle_envio %}<p>{{ pedido.detalle_envio }}</p>{% endif %}
-    {% endif %}
-    {% if pedido.estado == "entregado" %}
-      <p>Entregado {{ pedido.entregado_en|date:"d/m/Y H:i" }} a {{ pedido.entrega_recibio }}{% if pedido.entrega_documento %}, cédula {{ pedido.entrega_documento }}{% endif %}.</p>
-      {% if pedido.entrega_nota %}<p>{{ pedido.entrega_nota }}</p>{% endif %}
+      <p>Despacho: {{ pedido.transportadora }} · guía {{ pedido.tracking }}</p>
+      <p>Recibe: {{ pedido.recibe_nombre }} · {{ pedido.recibe_telefono }}</p>
     {% endif %}
   </div>
+  {% else %}
+  <p class="note">ERA shop mueve este pedido. Usted no ve el nombre, el teléfono ni la dirección de la otra parte.</p>
+  {% endif %}
 
   <div class="hilo">
     {% for m in mensajes %}

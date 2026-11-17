@@ -265,7 +265,7 @@ def registro_vendedor(request, modo="detal"):
                 login(request, user)
                 messages.success(
                     request,
-                    "Tienda lista. Con el mismo correo también puedes comprar. El cliente ve el contacto cuando pague.",
+                    "Tienda lista. Con el mismo correo también puedes comprar. Marque el punto del mapa en sus datos: ERA shop calcula el flete y las partes no se conocen.",
                 )
                 return redirect(_siguiente(request, "/vendedores/panel/"))
     grupos = Categoria.objects.filter(padre__isnull=True).prefetch_related("hijos")

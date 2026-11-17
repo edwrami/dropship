@@ -9,7 +9,7 @@
 {% endif %}
 <form method="post">{% csrf_token %}
   {{ form.as_p }}
-  <p class="muted">El público ve nombre, oficio, ciudad, precio, fotos, calificación y agenda. El teléfono sale después del pago de la cita.</p>
+  <p class="muted">El público ve el oficio, la ciudad, el precio, las fotos, la calificación y la agenda. El teléfono no se muestra, ni antes ni después del pago.</p>
   <button class="btn" type="submit">Crear ficha y pagar la cuota</button>
 </form>
 <p class="muted">¿Ya te registraste? <a href="{% url 'entrar_cuenta' %}">Entra</a> · <a href="{% url 'registro_cuenta' %}">Elegir otro rol</a>.</p>

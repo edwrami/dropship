@@ -4,7 +4,7 @@
 {% block content %}
 <p class="eyebrow">Cotización</p>
 <h2>{{ consulta.oferente.nombre }}{% if consulta.especialidad %} · {{ consulta.especialidad.oficio_texto }}{% endif %}</h2>
-<p class="note">Hablen aquí. El teléfono, el WhatsApp y el correo del oferente salen cuando el cliente pague. Los números que se peguen en el chat se tapan.</p>
+<p class="note">Hablen aquí del trabajo y del precio. El teléfono, el WhatsApp y el correo no se muestran. Los números que se peguen en el chat se tapan.</p>
 
 <div class="hilo">
   {% for m in mensajes %}

@@ -96,33 +96,8 @@ def _marcar_contacto(request, pedido):
 
 
 def contacto_visible(request, pedido):
-    """El teléfono del vendedor, mayorista o detallista, sale cuando la transferencia ya está aprobada."""
-    if not pedido or not pedido.vendedor_id or pedido.estado_pago != "aprobado":
-        return False
-    if request.user.is_authenticated and request.user.is_staff:
-        return True
-    if request.user.is_authenticated:
-        from vendedores.models import ClienteTienda, Comprador, Vendedor
-        try:
-            if request.user.vendedor.id == pedido.vendedor_id:
-                return True
-        except Vendedor.DoesNotExist:
-            pass
-        try:
-            if pedido.cliente_tienda_id and request.user.cliente_tienda.id == pedido.cliente_tienda_id:
-                return True
-        except ClienteTienda.DoesNotExist:
-            pass
-        try:
-            if pedido.comprador_id and request.user.comprador.id == pedido.comprador_id:
-                return True
-        except Comprador.DoesNotExist:
-            pass
-    clave = (request.GET.get("clave") or "").strip()
-    if clave and clave == pedido.clave_contacto:
-        _marcar_contacto(request, pedido)
-        return True
-    return pedido.id in request.session.get("pedidos_contacto", [])
+    """Solo ERA shop ve el teléfono y la dirección. Las partes no se conocen."""
+    return bool(pedido and request.user.is_authenticated and request.user.is_staff)
 
 
 def crear_pedido(request, producto_id):
@@ -181,9 +156,11 @@ def crear_pedido(request, producto_id):
         elif cantidad > 20:
             cantidad = 20
             precio = Decimal(producto.precio_vigente)
+        from .flete import cotizar
+        destino = perfil.get("comprador") or perfil.get("cliente_tienda")
         modo = producto.modo_envio or ("incluido" if producto.envio_gratis else "aparte")
         envio = Decimal("0")
-        if modo == "aparte":
+        if not cotizar(vendedor, destino, getattr(vendedor, "paga_flete", "")) and modo == "aparte":
             envio = Decimal(producto.costo_envio_cop or 0)
         subtotal = (precio * cantidad + envio).quantize(
             Decimal("1"), rounding=ROUND_HALF_UP,
@@ -222,14 +199,16 @@ def crear_pedido(request, producto_id):
         pedido.monto_cop = subtotal
         pedido.referencia_pago = f"PED-{pedido.id}"
         aplicar_comision(pedido)
+        from .flete import sumar_flete
+        sumar_flete(pedido, vendedor, perfil.get("comprador") or perfil.get("cliente_tienda"))
         pedido.save()
         MensajePedido.objects.create(
             pedido=pedido,
             autor="plataforma",
             nombre="ERA shop",
             texto=(
-                "Pedido creado. El teléfono, WhatsApp, correo y dirección del vendedor "
-                "aparecen en este pedido cuando la transferencia quede aprobada."
+                "Pedido creado. ERA shop recoge y entrega. Quien compra y quien vende no se conocen. "
+                "El flete sale de los dos puntos del mapa: lo paga quien vende eligió, quien compra, o los dos por mitad."
             ),
         )
 
@@ -446,7 +425,7 @@ def _nombre_autor(pedido, rol):
         return pedido.vendedor.nombre_tienda
     if rol == "plataforma":
         return "ERA shop"
-    return pedido.cliente_nombre
+    return "Quien compra"
 
 
 def conversacion_pedido(request, pedido_id):
@@ -545,7 +524,7 @@ def bodega_pedido(request, pedido_id):
         Pedido.objects.select_related("producto", "vendedor").prefetch_related("lineas__producto"),
         pk=pedido_id,
     )
-    if _rol_pedido(request, pedido) is None or not pedido.es_mayor:
+    if not request.user.is_authenticated or not request.user.is_staff or not pedido.es_mayor:
         raise Http404("Pedido no disponible")
     from .bodega import docx_bodega
 

@@ -7,6 +7,6 @@
 <p class="price">${{ cita.monto_cop|floatformat:0|intcomma }} COP</p>
 <p>{{ cita.oferente.oficio_texto }} · {{ cita.duracion_minutos|default:cita.oferente.duracion_minutos }} min</p>
 <p>Referencia <strong>{{ cita.referencia_pago }}</strong>.</p>
-<p class="note">Mismo cobro de una venta. El contacto sale cuando Wompi confirma. El giro al oferente espera a que marques el trabajo como realizado.</p>
+<p class="note">Mismo cobro de una venta. El contacto no se abre. El giro al oferente espera a que marques el trabajo como realizado y lo califiques.</p>
 {% include "servicios/_wompi.html" %}
 {% endblock %}

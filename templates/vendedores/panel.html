@@ -50,7 +50,7 @@
 
   {% if vendedor.es_proveedor %}
     <h3>Tiendas conectadas</h3>
-    <p class="muted">El precio normal se vende al detal en el catálogo y en tu tienda, como cualquier vendedor. La lista al por mayor lleva su precio, la cantidad mínima y las especificaciones. Las fotos son opcionales. El establecimiento suma productos y cantidades. A ese total se le suman tu porcentaje al por mayor y la tarifa de Wompi. A ti te queda el precio de la lista. El pedido se descarga en Word para bodega. El teléfono aparece para el cliente cuando la transferencia queda aprobada.</p>
+    <p class="muted">El precio normal se vende al detal en el catálogo y en tu tienda. La lista al por mayor lleva su precio y la cantidad mínima. El establecimiento suma productos y cantidades. A ese total se le suman el porcentaje al por mayor y la tarifa de Wompi. A usted le queda el precio de la lista. ERA shop recoge y entrega. Usted no ve el teléfono ni la dirección del establecimiento, y él no ve los suyos.</p>
     <table>
       <tr><th>Tienda</th><th>Ciudad</th><th>Desde</th></tr>
       {% for c in conexiones %}
@@ -121,28 +121,15 @@
   <h3>Comentarios</h3>
   {% for c in comentarios %}
     <article class="card">
-      <p><strong>{{ c.estrellas }} de 5</strong> · {{ c.pedido.cliente_nombre }} · {{ c.creado|date:"d/m/Y" }}</p>
+      <p><strong>{{ c.estrellas }} de 5</strong> · Un cliente · {{ c.creado|date:"d/m/Y" }}</p>
       {% if c.comentario %}<p>{{ c.comentario }}</p>{% endif %}
     </article>
   {% empty %}
     <p>Todavía no tienes comentarios.</p>
   {% endfor %}
 
-  <h3>Clientes</h3>
-  <p class="muted">Quienes pidieron en tu tienda. Los mismos datos quedan en el registro de ERA shop.</p>
-  <table>
-    <tr><th>Nombre</th><th>Cédula</th><th>Teléfono</th><th>Dirección</th></tr>
-    {% for c in clientes %}
-      <tr>
-        <td>{{ c.cliente_nombre }}{% if c.cliente_email %}<br><small>{{ c.cliente_email }}</small>{% endif %}</td>
-        <td>{{ c.cliente_documento|default:"—" }}</td>
-        <td>{{ c.cliente_telefono }}</td>
-        <td>{{ c.cliente_direccion }}{% if c.cliente_barrio %}, {{ c.cliente_barrio }}{% endif %} · {{ c.cliente_ciudad }}{% if c.cliente_departamento %}, {{ c.cliente_departamento }}{% endif %}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="4">Todavía no tienes clientes.</td></tr>
-    {% endfor %}
-  </table>
+  <h3>Pedidos recibidos</h3>
+  <p class="muted">No ves el nombre, el teléfono ni la dirección de quien compra. ERA shop recoge y entrega.</p>
 
   <h3>Pedidos</h3>
   <p class="muted">El pedido es el canal con el cliente. {% if vendedor.es_proveedor %}En la lista al por mayor el establecimiento paga el precio más el porcentaje y Wompi. En el detal, igual que cualquier tienda, esos cargos salen del precio.{% else %}Del precio se descuentan el porcentaje de ERA shop y la tarifa de Wompi.{% endif %} El resto se consigna al Nequi de esta tienda.</p>

@@ -45,33 +45,13 @@ def pdf_pedido(pedido):
     if giro:
         lineas.append(f"Comision ERA shop: ${giro.comision_cop}")
         lineas.append(f"Para la tienda: ${giro.monto_cop} · {giro.get_estado_display()}")
-        if giro.destino_nequi:
-            lineas.append(f"Nequi de la tienda: {giro.destino_nequi}")
     if pedido.tracking:
         lineas.append(f"Guia: {pedido.transportadora} {pedido.tracking}")
-    if pedido.fecha_despacho:
-        lineas.append(f"Despacho: {pedido.fecha_despacho:%d/%m/%Y}")
-    if pedido.entrega_recibio:
-        lineas.append(f"Entregado a: {pedido.entrega_recibio}")
+    if pedido.flete_cop:
+        lineas.append(f"Flete: ${pedido.flete_cop} · {pedido.flete_km} km")
     if pedido.vendedor_id:
         lineas.append(f"Tienda: {pedido.vendedor.nombre_tienda} · {pedido.vendedor.ciudad}")
-    if pedido.estado_pago == "aprobado" and pedido.contacto_telefono:
-        lineas.append(f"Contacto: {pedido.contacto_responsable}")
-        lineas.append(f"Telefono: {pedido.contacto_telefono}")
-        if pedido.contacto_whatsapp:
-            lineas.append(f"WhatsApp: {pedido.contacto_whatsapp}")
-        if pedido.contacto_email:
-            lineas.append(f"Correo: {pedido.contacto_email}")
-        if pedido.contacto_direccion:
-            lineas.append(f"Direccion tienda: {pedido.contacto_direccion[:90]}")
-    lineas.append(f"Cliente: {pedido.cliente_nombre}")
-    if pedido.cliente_documento:
-        lineas.append(f"Cedula: {pedido.cliente_documento}")
-    lineas.append(f"Entrega: {pedido.cliente_direccion[:90]}")
-    lineas.append(pedido.cliente_ciudad)
-    if pedido.variante:
-        lineas.append(f"Variante: {pedido.variante[:80]}")
-    lineas.append("La conversacion del pedido es el canal con la tienda.")
+    lineas.append("ERA shop recoge y entrega. Las partes no ven el teléfono ni la dirección del otro.")
 
     comandos = ["BT", "/F1 11 Tf", "50 800 Td", "16 TL"]
     for linea in lineas:

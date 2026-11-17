@@ -134,6 +134,13 @@ class DatosVendedorForm(forms.Form):
         help_text="Celular de 10 dígitos. Ahí llega el precio menos el porcentaje de ERA shop y menos la tarifa de Wompi.",
     )
     direccion = forms.CharField(label="Dirección", widget=forms.Textarea(attrs={"rows": 2}))
+    lat = forms.DecimalField(label="Latitud del punto de despacho", max_digits=9, decimal_places=6, required=False)
+    lng = forms.DecimalField(label="Longitud del punto de despacho", max_digits=9, decimal_places=6, required=False)
+    paga_flete = forms.ChoiceField(
+        label="Quién paga el flete",
+        choices=[("comprador", "Lo paga quien compra"), ("vendedor", "Lo pago yo"), ("mitad", "Por mitad")],
+        help_text="ERA shop recoge y entrega. El viaje se calcula con su punto y el de quien compra. La otra parte no ve el punto.",
+    )
     ciudad = forms.CharField(label="Ciudad", max_length=100)
     departamento = forms.ChoiceField(label="Departamento", choices=DEPARTAMENTOS_CHOICES)
     tipo = forms.ChoiceField(
@@ -403,7 +410,7 @@ class DatosClienteForm(forms.ModelForm):
         model = ClienteTienda
         fields = [
             "nombre_tienda", "responsable", "documento", "telefono",
-            "direccion", "barrio", "ciudad", "departamento", "referencia",
+            "direccion", "lat", "lng", "barrio", "ciudad", "departamento", "referencia",
         ]
         labels = {
             "nombre_tienda": "Nombre del establecimiento",
@@ -502,7 +509,7 @@ class DatosCompradorForm(forms.ModelForm):
     class Meta:
         model = Comprador
         fields = [
-            "nombre", "documento", "telefono", "direccion", "barrio",
+            "nombre", "documento", "telefono", "direccion", "lat", "lng", "barrio",
             "ciudad", "departamento", "referencia",
         ]
         labels = {

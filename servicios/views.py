@@ -679,7 +679,7 @@ def resultado_cita(request, cita_id):
                 return render(request, "servicios/resultado.html", {
                     "cita": cita,
                     "pagado": contacto,
-                    "contacto_visible": contacto,
+                    "contacto_visible": request.user.is_staff,
                     "form": form,
                     "clave": cita.clave_contacto,
                     "puede_cerrar": not cita.trabajo_realizado,
@@ -707,7 +707,7 @@ def resultado_cita(request, cita_id):
     return render(request, "servicios/resultado.html", {
         "cita": cita,
         "pagado": contacto,
-        "contacto_visible": contacto,
+        "contacto_visible": request.user.is_staff,
         "form": form,
         "clave": cita.clave_contacto,
         "puede_cerrar": contacto and not cita.trabajo_realizado and not es_oferente,
@@ -889,7 +889,7 @@ def preguntar_precio(request, slug):
     email = (request.POST.get("email") or "").strip()
     texto = sin_contacto(request.POST.get("mensaje") or "")
     if len(nombre) < 3 or len(telefono) < 7 or len(texto) < 8:
-        messages.error(request, "Escribe tu nombre, un teléfono y qué necesitas. El oferente no verá el teléfono hasta que pagues.")
+        messages.error(request, "Escribe tu nombre, un teléfono y qué necesitas. El oferente no ve el teléfono.")
         return redirect("detalle_oferente", slug=slug)
     consulta = Consulta.objects.create(
         oferente=oferente,
@@ -976,7 +976,7 @@ def consulta_servicio(request, consulta_id):
         "es_oferente": es_oferente,
         "es_cliente": es_cliente,
         "clave": consulta.clave,
-        "contacto_visible": bool(consulta.cita_id and consulta.cita.estado_pago == "aprobado"),
+        "contacto_visible": request.user.is_staff,
     })
 
 
